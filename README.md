@@ -46,6 +46,9 @@ Cloudflare's dashboard menus get renamed now and then, so a label below might be
 | Hold a closed fist (about half a second) | Back to the room |
 | Pinch thumb, index and middle finger together, then drag up or down | Grabs the open page and scrolls it |
 | Hold a thumbs up | Saves what you're working on |
+| While petting: rub the big hand over the pet | Makes the pet happy |
+| While petting: clap | The pet jumps and does a trick |
+| While petting: lower your hand for 3 seconds | Zooms back out |
 
 For the best tracking, face a light source, keep your hand 40 to 70 cm from the laptop, and keep the background plain.
 

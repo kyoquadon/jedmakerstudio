@@ -228,6 +228,8 @@ footer a{color:var(--blue)}
 .hand-cursor.pinch{background:rgba(255,200,58,.85);transform:scale(.7)}
 .hand-cursor.lost{opacity:.3}
 .hand-cursor.grab{background:rgba(47,91,234,.55);border-radius:10px}
+.hand-cursor.petting-hand{width:150px;height:150px;margin:-75px 0 0 -75px;border:0;border-radius:0;box-shadow:none;background:url(assets/icons/raised_hand.webp) center/contain no-repeat;opacity:.55;filter:drop-shadow(0 6px 10px rgba(0,0,0,.35))}
+.hand-cursor.petting-hand.rubbing{opacity:.75}
 .hand-cursor.click{box-shadow:0 0 0 2px #1d2030,0 0 0 10px rgba(255,200,58,.6)}
 #handSwap{cursor:pointer;font:inherit;font-size:.8rem;font-weight:700}
 

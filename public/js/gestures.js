@@ -4,7 +4,7 @@
    just before your fingers closed, so the pinch itself can't drag anything).
    Open palm moved around = look around the room.
    Both hands pinched: pull apart or push together to zoom, twist to turn.
-   Closed fist (hold) = back to the room. Pinch thumb, index and middle finger together, then drag up or down = scroll the open page. Thumbs up (hold) = save. */
+   Closed fist (hold) = back to the room. While petting: rub with the big hand over the pet, clap for a trick, lower your hand for 3 seconds to step back. Pinch thumb, index and middle finger together, then drag up or down = scroll the open page. Thumbs up (hold) = save. */
 (() => {
   'use strict';
   const MP = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.0';
@@ -18,7 +18,7 @@
   let rec = null, video = null, stream = null, running = false, lastVT = -1;
   const cur = {x: innerWidth / 2, y: innerHeight / 2}; const hist = [];
   const P = {grab: null, pinched: false, onCount: 0, fistSince: 0, fistDone: false, thumbSince: 0, thumbDone: false, palm: null, peace: null, lost: 0};
-  let two = null; // {d, a} while both hands pinch
+  let two = null; const clapHist = []; let lastClap = 0; // {d, a} while both hands pinch
   const hands2 = {L: false, R: false};
   const cursor = document.createElement('div'); cursor.className = 'hand-cursor lost'; cursor.hidden = true; cursor.setAttribute('aria-hidden', 'true'); document.body.appendChild(cursor);
   const say = t => { status.hidden = !t; status.textContent = t || ''; };
@@ -49,17 +49,33 @@
   const pinchRatio = lm => dist(lm[4], lm[8]) / (dist(lm[0], lm[9]) || 0.1);
   function handle(res, now) {
     const {pointer, other} = sortHands(res);
+    const petting = H.isPetting && H.isPetting();
+    cursor.classList.toggle('petting-hand', !!petting);
+    // clap: two palms rushing together (or two hands merging into one) = the pet does a trick
+    if (pointer && other) { const d = dist(pointer.lm[9], other.lm[9]); clapHist.push({d, t: now}); while (clapHist.length && now - clapHist[0].t > 500) clapHist.shift(); if (d < 0.16 && clapHist.some(h => h.d > 0.32) && now - lastClap > 1200) { lastClap = now; clapHist.length = 0; H.trick && H.trick(); } }
+    else if (clapHist.length && now - clapHist[clapHist.length - 1].t < 200 && clapHist[clapHist.length - 1].d < 0.26 && clapHist.some(h => h.d > 0.32) && now - lastClap > 1200) { lastClap = now; clapHist.length = 0; H.trick && H.trick(); }
+    // while petting: lowering your hand for 3 seconds steps back out
+    if (petting) { if (!pointer) { if (!P.petAway) P.petAway = now; else if (now - P.petAway > 3000) { P.petAway = 0; H.stopPetting && H.stopPetting(); } } else P.petAway = 0; } else P.petAway = 0;
     if (!pointer) { cursor.classList.add('lost'); cursor.classList.remove('grab'); P.grab = null; P.pinched = false; P.onCount = 0; P.palm = P.peace = null; P.fistSince = P.thumbSince = 0; two = null; return; }
     cursor.classList.remove('lost');
     const lm = pointer.lm, g = pointer.g;
     // two-hand pinch: zoom and turn
-    if (other && pinchRatio(lm) < PINCH_ON && pinchRatio(other.lm) < PINCH_ON) {
+    if (!petting && other && pinchRatio(lm) < PINCH_ON && pinchRatio(other.lm) < PINCH_ON) {
       const a = {x: (lm[4].x + lm[8].x) / 2, y: (lm[4].y + lm[8].y) / 2}, b = {x: (other.lm[4].x + other.lm[8].x) / 2, y: (other.lm[4].y + other.lm[8].y) / 2};
       const d = dist(a, b), ang = Math.atan2(b.y - a.y, b.x - a.x);
       if (two) { if (H.zoom) H.zoom(two.d / d); let da = ang - two.a; da = Math.atan2(Math.sin(da), Math.cos(da)); if (H.look) H.look(-da * 500, 0); }
       two = {d, a: ang}; P.pinched = true; P.onCount = 0; cursor.classList.add('pinch'); return;
     }
-    if (two) { two = null; P.pinched = true; } // keep pinch latched until the fingers open, so ending a zoom never clicks
+    if (two) { two = null; P.pinched = true; }
+    if (petting) {
+      // the big translucent hand follows your palm; rub only counts while it is over the pet
+      const px = clamp((1 - lm[9].x - 0.15) / 0.7) * innerWidth, py = clamp((lm[9].y - 0.12) / 0.62) * innerHeight;
+      cur.x += (px - cur.x) * 0.4; cur.y += (py - cur.y) * 0.4; cursor.style.transform = `translate(${cur.x}px, ${cur.y}px)`;
+      const over = H.overPet && H.overPet(cur.x, cur.y); cursor.classList.toggle('rubbing', !!over);
+      if (over) H.rubInput(cur.x, true);
+      if ([g, other && other.g].includes('Closed_Fist')) { if (!P.fistSince) P.fistSince = now; else if (now - P.fistSince > 600 && H.stopPetting) { P.fistSince = 0; H.stopPetting(); } } else P.fistSince = 0;
+      P.palm = null; return;
+    } // keep pinch latched until the fingers open, so ending a zoom never clicks
     // cursor follows the index fingertip, smoothed
     const tx = clamp((1 - lm[8].x - 0.15) / 0.7) * innerWidth, ty = clamp((lm[8].y - 0.12) / 0.62) * innerHeight;
     const pr = pinchRatio(lm);
@@ -82,13 +98,7 @@
     const has = name => gs.includes(name);
     if (has('Closed_Fist') && !P.pinched) { if (!P.fistSince) P.fistSince = now; if (!P.fistDone && now - P.fistSince > 600) { P.fistDone = true; if (location.hash && location.hash !== '#room') { location.hash = 'room'; H.notice && H.notice('Back in the room.'); } } } else { P.fistSince = 0; P.fistDone = false; }
     if (has('Thumb_Up')) { if (!P.thumbSince) P.thumbSince = now; if (!P.thumbDone && now - P.thumbSince > 700) { P.thumbDone = true; const st = location.hash.slice(1); const b = SAVE[st] && document.querySelector(SAVE[st]); if (b && b.offsetParent !== null && !b.disabled) b.click(); else H.notice && H.notice('Nothing to save here yet.'); } } else { P.thumbSince = 0; P.thumbDone = false; }
-    if (H.isPetting && H.isPetting()) {
-      // rub the pet's head: any hand moving back and forth (open palm reads best)
-      const rubHand = (other && other.g === 'Open_Palm') ? other : pointer;
-      H.rubInput((1 - rubHand.lm[9].x) * innerWidth, true);
-      if (has('Closed_Fist') && P.fistSince && now - P.fistSince > 600 && H.stopPetting) H.stopPetting();
-      P.palm = null; return;
-    }
+
     const palmHand = other && other.g === 'Open_Palm' ? other : (g === 'Open_Palm' && !P.pinched ? pointer : null);
     if (palmHand) { const px = (1 - palmHand.lm[0].x) * innerWidth, py = palmHand.lm[0].y * innerHeight; if (P.palm && H.look) H.look((px - P.palm.x) * 1.4, (py - P.palm.y) * 0.6); P.palm = {x: px, y: py}; } else P.palm = null;
 
@@ -114,12 +124,12 @@
       }
       stream = await navigator.mediaDevices.getUserMedia({video: {width: 640, height: 480, facingMode: 'user'}, audio: false});
       video = video || Object.assign(document.createElement('video'), {playsInline: true, muted: true}); video.srcObject = stream; await video.play();
-      running = true; prev.hidden = false; cursor.hidden = false; (document.getElementById('handLbl') || btn).textContent = 'Hand control: on'; btn.setAttribute('aria-pressed', 'true'); say(help()); loop();
+      running = true; window.HAND_CONTROL_ON = true; prev.hidden = false; cursor.hidden = false; (document.getElementById('handLbl') || btn).textContent = 'Hand control: on'; btn.setAttribute('aria-pressed', 'true'); say(help()); loop();
       const sw = document.getElementById('handSwap'); if (sw) sw.hidden = false;
     } catch (e) { console.warn(e); say(e && e.name === 'NotAllowedError' ? 'Camera permission was declined. Allow the camera for this site in your browser settings, then try again.' : 'Hand tracking could not start. Check that no other app is using the camera.'); stop(true); }
     btn.disabled = false;
   }
-  function stop(keepMsg) { running = false; P.pinched = false; two = null; if (stream) stream.getTracks().forEach(t => t.stop()); stream = null; prev.hidden = true; cursor.hidden = true; (document.getElementById('handLbl') || btn).textContent = 'Hand control: off'; btn.setAttribute('aria-pressed', 'false'); const sw = document.getElementById('handSwap'); if (sw) sw.hidden = true; if (!keepMsg) say(''); }
+  function stop(keepMsg) { running = false; window.HAND_CONTROL_ON = false; cursor.classList.remove('petting-hand'); P.pinched = false; two = null; if (stream) stream.getTracks().forEach(t => t.stop()); stream = null; prev.hidden = true; cursor.hidden = true; (document.getElementById('handLbl') || btn).textContent = 'Hand control: off'; btn.setAttribute('aria-pressed', 'false'); const sw = document.getElementById('handSwap'); if (sw) sw.hidden = true; if (!keepMsg) say(''); }
   btn.addEventListener('click', () => running ? stop() : start());
   const sw = document.getElementById('handSwap');
   if (sw) { sw.textContent = lefty ? 'Pointer: left hand' : 'Pointer: right hand'; sw.addEventListener('click', () => { lefty = !lefty; try { localStorage.setItem('studio-lefty', lefty ? '1' : '0'); } catch (e) {} sw.textContent = lefty ? 'Pointer: left hand' : 'Pointer: right hand'; if (running) say(help()); }); }

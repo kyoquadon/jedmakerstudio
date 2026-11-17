@@ -1539,7 +1539,8 @@ const Room = (() => {
       else { if (now > P.blinkAt) { P.blinkAt = now + 2500 + Math.random() * 3000; P.blinkEnd = now + 130; } m.eyes.forEach(e => e.scale.y = now < (P.blinkEnd || 0) && P.cfg.kind !== 'robot' ? 0.15 : 1); if (P.state === 'idle' || P.state === 'sit') m.head.rotation.y = Math.sin(t * 0.7 + i) * 0.5; }
       if (P.state === 'sit' && P.cfg.kind !== 'robot') { m.body.rotation.x = -0.25; } else m.body.rotation.x = 0;
       if (P.state !== 'play' || P.cfg.kind !== 'bunny') if (P.cfg.kind !== 'otter') m.body.rotation.y = 0;
-      m.root.position.set(P.x, y, P.z); m.root.rotation.y = P.heading;
+      let spin = 0; if (P.trickT0) { const k = (now - P.trickT0) / 1200; if (k < 1) { y += Math.sin(k * Math.PI) * 0.55; spin = k * Math.PI * 2; if (P.cfg.kind === 'otter') m.body.rotation.z = k * Math.PI * 2; if (P.cfg.kind === 'bunny') m.body.rotation.x = -Math.sin(k * Math.PI) * 0.6; } else { P.trickT0 = 0; m.body.rotation.z = 0; } }
+      m.root.position.set(P.x, y, P.z); m.root.rotation.y = P.heading + spin;
     });
   }
   function petIt(i) { startPetting(i); }
@@ -1551,7 +1552,7 @@ const Room = (() => {
     const cp = R.camera.position; const dx = cp.x - P.x, dz = cp.z - P.z, d = Math.hypot(dx, dz) || 1;
     const tgt = new THREE.Vector3(P.x, 0.35, P.z), pos = new THREE.Vector3(P.x + dx / d * 1.35, 0.95, P.z + dz / d * 1.35);
     R.tw = {from: {pos: R.cur.pos.clone(), tgt: R.cur.tgt.clone()}, to: {pos, tgt}, t0: now, dur: reduceMotion ? 1 : 900}; R.yaw = 0; R.pitch = 0; R.zoomF = 1;
-    $('#roomCaption').textContent = `Give ${P.cfg.name} a rub: move your cursor back and forth over ${P.cfg.kind === 'robot' ? 'it' : 'them'}, or rub with an open hand. Click anywhere else to stop.`;
+    $('#roomCaption').textContent = window.HAND_CONTROL_ON ? `Rub ${P.cfg.name}: move the big hand over ${P.cfg.kind === 'robot' ? 'it' : 'them'} and rub side to side. Clap for a trick. Lower your hand for 3 seconds to step back.` : `Give ${P.cfg.name} a rub: move your cursor back and forth over ${P.cfg.kind === 'robot' ? 'it' : 'them'}. Click anywhere else to stop.`;
   }
   function endPetting(silent) {
     const Pt = R.petting; if (!Pt) return; R.petting = null;
@@ -1572,6 +1573,14 @@ const Room = (() => {
       const pc = CFG.pets.find(p => p.kind === P.cfg.kind); if (pc) { pc.petted = (pc.petted || 0) + 1; P.cfg.petted = pc.petted; scheduleSave(); }
       setTimeout(() => { if (R.petting === Pt) endPetting(); }, 2400);
     }
+  }
+  const TRICKS = {cat: 'does a spinning leap!', dog: 'jumps and spins for you!', otter: 'does a barrel roll!', bunny: 'pulls off a huge binky!', robot: 'does a 360 hover spin!'};
+  function trick() {
+    const now = performance.now(); const list = R.petting ? [R.pets[R.petting.i]] : R.pets;
+    list.forEach((P, k) => { if (!P || (P.trickT0 && now - P.trickT0 < 1200)) return; P.trickT0 = now + k * 150; for (let j = 0; j < 5; j++) setTimeout(() => spawnFx('heart', P.x + (Math.random() - 0.5) * 0.4, 0.8, P.z + (Math.random() - 0.5) * 0.4), 300 + j * 80); });
+    if (CFG.sound && list[0]) { petSound(list[0].cfg.kind); tone('sine', 400, 1200, 0.35, 0.06, 0.1); }
+    if (list[0]) $('#roomCaption').textContent = `${list[0].cfg.name} ${TRICKS[list[0].cfg.kind]}`;
+    if (R.petting && !R.petting.done) { rubbed(); rubbed(); }
   }
   function rubInput(x, isHand) {
     const Pt = R.petting; if (!Pt || Pt.done) return;
@@ -1628,7 +1637,7 @@ const Room = (() => {
     R.skyline = []; let bx = 0; while (bx < 512) { const bw = 50 + Math.random() * 40, bh = 90 + Math.random() * 120; const win = []; for (let wy = 360 - bh + 10; wy < 354; wy += 12) for (let wx = bx + 6; wx < bx + bw - 6; wx += 10) win.push([wx, wy, Math.random() < 0.45]); R.skyline.push({x: bx, w: bw, h: bh, win}); bx += bw + 6; }
     rebuildAll(); rebuildPets(); drawSky(0);
     const el = renderer.domElement; let down = null; const ray = new THREE.Raycaster(); const v2 = new THREE.Vector2();
-    const pickAt = (cx, cy) => { const r = el.getBoundingClientRect(); v2.set(((cx - r.left) / r.width) * 2 - 1, -((cy - r.top) / r.height) * 2 + 1); ray.setFromCamera(v2, camera); const ph = ray.intersectObjects(R.petsG.children, true)[0]; if (ph && ph.object.userData.pet !== undefined) return {pet: ph.object.userData.pet}; const hits = ray.intersectObjects(Object.values(R.groups), true); for (const h of hits) { let o = h.object; while (o && !o.userData.station) o = o.parent; if (o) return {st: o.userData.station}; } return null; };
+    const pickAt = R.pickAt = (cx, cy) => { const r = el.getBoundingClientRect(); v2.set(((cx - r.left) / r.width) * 2 - 1, -((cy - r.top) / r.height) * 2 + 1); ray.setFromCamera(v2, camera); const ph = ray.intersectObjects(R.petsG.children, true)[0]; if (ph && ph.object.userData.pet !== undefined) return {pet: ph.object.userData.pet}; const hits = ray.intersectObjects(Object.values(R.groups), true); for (const h of hits) { let o = h.object; while (o && !o.userData.station) o = o.parent; if (o) return {st: o.userData.station}; } return null; };
     el.addEventListener('pointerdown', e => { down = {x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY}; try { el.setPointerCapture(e.pointerId); } catch (er) {} ac(); if (R.ac && R.ac.state === 'suspended') R.ac.resume(); });
     el.addEventListener('pointermove', e => { if (R.petting) { const h = pickAt(e.clientX, e.clientY); if (h && h.pet === R.petting.i) rubInput(e.clientX, false); return; } if (down) { const ym = R.camera.aspect < 0.8 ? 0.75 : 0.45; R.yaw = Math.max(-ym, Math.min(ym, R.yaw - (e.clientX - down.x) * 0.003)); R.pitch = Math.max(-0.2, Math.min(0.25, R.pitch + (e.clientY - down.y) * 0.002)); down.x = e.clientX; down.y = e.clientY; return; } if (e.pointerType === 'mouse') setHover(pickAt(e.clientX, e.clientY)); });
     el.addEventListener('pointerup', e => { const moved = down ? Math.hypot(e.clientX - down.sx, e.clientY - down.sy) : 99; down = null; if (moved < 6) { const h = pickAt(e.clientX, e.clientY); if (R.petting && !(h && h.pet === R.petting.i)) { endPetting(!(h && h.st)); if (!h || !h.st) return; } if (h && h.pet !== undefined) petIt(h.pet); else if (h && h.st) { Room.pulse(h.st); goto(h.st); } } });
@@ -1679,6 +1688,8 @@ const Room = (() => {
     focus(st, fromPet) { if (!R) return; if (R.petting && !fromPet) endPetting(true); R.focusSt = st || null; R.tw = {from: {pos: R.cur.pos.clone(), tgt: R.cur.tgt.clone()}, to: viewFor(st), t0: performance.now(), dur: reduceMotion ? 1 : 1100}; R.yaw = 0; R.pitch = 0; R.zoomF = 1; if (fromPet) R.hover = null; else setHover(null); if (st && SPOT[st] && R.pets.length && Math.random() < 0.7) { const P = R.pets[0]; if (P.state !== 'sleep') walkTo(P, SPOT[st][0], SPOT[st][1], 'sit', performance.now()); } },
     pulse(st) { if (R && st === 'machine') R.leverT = performance.now(); },
     isPetting() { return !!(R && R.petting); },
+    overPet(x, y) { if (!R || !R.petting || !R.pickAt) return false; const h = R.pickAt(x, y); return !!(h && h.pet === R.petting.i); },
+    trick() { if (R) trick(); },
     petScreen(i) { if (!R || !R.pets[i]) return null; const P = R.pets[i]; const v = new THREE.Vector3(P.x, 0.3, P.z).project(R.camera); const r = R.renderer.domElement.getBoundingClientRect(); return {x: r.left + (v.x + 1) / 2 * r.width, y: r.top + (1 - v.y) / 2 * r.height}; },
     rubInput(x, isHand) { if (R) rubInput(x, isHand); },
     stopPetting() { if (R && R.petting) endPetting(); },
@@ -1907,7 +1918,7 @@ if (window.STUDIO_HOSTED) $('#importLbl').hidden = false;
   let peek = null;
   document.addEventListener('pointermove', e => { const a = e.target && e.target.closest ? e.target.closest('.room-bottom .stations a') : null; if (a === peek) return; if (peek) peek.classList.remove('peek'); peek = a; if (a) a.classList.add('peek'); });
 })();
-window.StudioHooks = {look: (dx, dy) => Room.look(dx, dy), zoom: f => Room.zoom(f), isPetting: () => Room.isPetting(), rubInput: (x, h) => Room.rubInput(x, h), stopPetting: () => Room.stopPetting(), petScreen: i => Room.petScreen(i || 0), notice, stations: STATIONS};
+window.StudioHooks = {look: (dx, dy) => Room.look(dx, dy), zoom: f => Room.zoom(f), isPetting: () => Room.isPetting(), rubInput: (x, h) => Room.rubInput(x, h), stopPetting: () => Room.stopPetting(), overPet: (x, y) => Room.overPet(x, y), trick: () => Room.trick(), petScreen: i => Room.petScreen(i || 0), notice, stations: STATIONS};
 /* ---------- boot ---------- */
 async function migrate() {
   const local = S.localItems.filter(x => !store.items.find(y => y.id === x.id));
