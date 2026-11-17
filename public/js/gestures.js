@@ -55,7 +55,7 @@
     ovDirty = true;
   }
   const say = t => { status.hidden = !t; status.textContent = t || ''; };
-  const help = () => `Hand control on (${lefty ? 'left' : 'right'} hand points). Point to move, pinch to click, wave an open palm to look around, pinch with both hands and pull apart to zoom or twist to turn, pinch thumb, index and middle finger together and drag to scroll, hold a fist for the room, hold a thumbs up to save, make a finger gun to make the pets stand, then shoot for play dead. Use Calibrate if anything feels off.`;
+  const help = () => `Hand control on (${lefty ? 'left' : 'right'} hand points). Point to move, pinch to click, wave an open palm to look around, pinch with both hands and pull apart to zoom or twist to turn, pinch thumb, index and middle finger together and drag to scroll, hold a fist for the room, hold a thumbs up to save, and while zoomed in on a pet: clap for a trick, make a finger gun to make it stand, then shoot for play dead. Use Calibrate if anything feels off.`;
   const clamp = v => Math.max(0, Math.min(1, v));
   const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
   const H = window.StudioHooks || {};
@@ -128,7 +128,7 @@
     const {pointer, other} = sortHands(res);
     const petting = H.isPetting && H.isPetting();
     cursor.classList.toggle('petting-hand', !!petting); cursor2.classList.toggle('petting-hand', !!petting);
-    if (detectClap(pointer, other, now)) H.trick && H.trick();
+    if (detectClap(pointer, other, now) && petting) H.trick && H.trick(); // tricks only while zoomed in on a pet
     const clapGrace = now - lastClap < 2500; // just after a clap, nothing can end petting
     // petting: lowering every hand for 3 seconds steps back out
     if (petting) { if (!pointer) { if (!P.petAway) P.petAway = now; else if (now - P.petAway > 3000 && !clapGrace) { P.petAway = 0; H.stopPetting && H.stopPetting(); } } else P.petAway = 0; } else P.petAway = 0;
@@ -174,7 +174,8 @@
       if (pr < C.pinchOn && !middleNear(lm)) { if (++P.onCount >= PINCH_FRAMES) { P.pinched = true; P.onCount = 0; const back = hist.find(h => now - h.t <= 150) || hist[0] || cur; cur.x = back.x; cur.y = back.y; place(cursor, cur); cursor.classList.add('pinch'); clickAt(cur); } }
       else { P.onCount = 0; pe('pointermove', at(cur), cur); }
     } else if (pr > C.pinchOff && P.grab === null) { P.pinched = false; cursor.classList.remove('pinch'); }
-    const gunning = gunCheck(pointer, other, now);
+    if (G.standing) { G.standing = false; G.since = 0; } // the gun only works while zoomed in on a pet
+    const gunning = [pointer, other].some(h => h && gunShape(h.lm).aim);
     const has = name => [g, other && other.g].includes(name);
     if (has('Closed_Fist') && !P.pinched) { if (!P.fistSince) P.fistSince = now; if (!P.fistDone && now - P.fistSince > 600) { P.fistDone = true; if (location.hash && location.hash !== '#room') { location.hash = 'room'; H.notice && H.notice('Back in the room.'); } } } else { P.fistSince = 0; P.fistDone = false; }
     if (has('Thumb_Up') && !gunning) { if (!P.thumbSince) P.thumbSince = now; if (!P.thumbDone && now - P.thumbSince > 700) { P.thumbDone = true; const st = location.hash.slice(1); const b = SAVE[st] && document.querySelector(SAVE[st]); if (b && b.offsetParent !== null && !b.disabled) b.click(); else H.notice && H.notice('Nothing to save here yet.'); } } else { P.thumbSince = 0; P.thumbDone = false; }

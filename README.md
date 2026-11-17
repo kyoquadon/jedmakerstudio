@@ -49,8 +49,8 @@ Cloudflare's dashboard menus get renamed now and then, so a label below might be
 | While petting: rub the big hand over the pet | Makes the pet happy |
 | While petting: clap | The pet jumps and does a trick |
 | While petting: lower your hands for 3 seconds | Zooms back out |
-| Finger gun held up (thumb up, index out or aimed at the camera) | Pets stand on their hind legs |
-| Then shoot: drop the thumb or flick the barrel up | Pets play dead, then spring back up after 3 seconds |
+| While petting: finger gun held up (thumb up, index out or aimed at the camera) | The pet stands on its hind legs |
+| While petting: shoot (drop the thumb or flick the barrel up) | The pet plays dead, then springs back up after 3 seconds |
 
 If pinches or claps feel off, press **Calibrate hands** (hover the status pill at the top right). It walks you through six short checks and tunes reach, pinch, three-finger pinch and clap to your camera. The settings are saved in that browser.
 

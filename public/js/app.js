@@ -1568,7 +1568,7 @@ const Room = (() => {
   function endPetting(silent) {
     const Pt = R.petting; if (!Pt) return; R.petting = null;
     const P = R.pets[Pt.i]; const now = performance.now();
-    if (P) { P.state = 'happy'; P.t0 = now; P.until = now + 1200; }
+    if (P) { P.state = 'happy'; P.t0 = now; P.until = now + 1200; P.stand = false; }
     if (!silent) Room.focus(Pt.back, true);
   }
   function rubbed() {
