@@ -78,7 +78,7 @@
     } else if (!ovClear) { handsS = []; drawHands([]); ovClear = true; }
   }
   const say = t => { status.hidden = !t; status.textContent = t || ''; };
-  const help = () => `Hand control on (${lefty ? 'left' : 'right'} hand points). Point to move, pinch to click, wave an open palm to look around, pinch with both hands and pull apart to zoom or twist to turn, pinch thumb, index and middle finger together and drag to scroll, hold a fist for the room, hold a thumbs up to save, and while zoomed in on a pet: clap for a trick, make a finger gun to make it stand, then shoot for play dead. Use Calibrate if anything feels off.`;
+  const help = () => `Hand control on (${lefty ? 'left' : 'right'} hand points). Point to move, pinch to click, wave an open palm to look around, pinch with both hands and pull apart to zoom or twist to turn, pinch thumb, index and middle finger together and drag to scroll (on the thermostat, hold that pinch and twist your wrist to turn the dial), hold a fist for the room, hold a thumbs up to save, and while zoomed in on a pet: clap for a trick, make a finger gun to make it stand, then shoot for play dead. Use Calibrate if anything feels off.`;
   const clamp = v => Math.max(0, Math.min(1, v));
   const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
   const H = window.StudioHooks || {};
@@ -176,6 +176,7 @@
     dial = !petting && !!(H.isThermo && H.isThermo());
     cursor2.hidden = true; if (!petting && !dial && (ovDirty || handsT.length)) { handsT = []; drawHands([]); ovClear = true; ov.hidden = true; } if (!petting && !dial && running && !CAL.active) cursor.hidden = false;
     if (!pointer && (petting || dial)) handsT = [];
+    if (!pointer && P.twist) { P.twist = null; H.thermoGrip && H.thermoGrip(false); }
     if (!pointer) { cursor.classList.add('lost'); cursor.classList.remove('grab'); P.grab = null; P.pinched = false; P.onCount = 0; P.palm = null; P.fistSince = P.thumbSince = 0; two = null; return; }
     cursor.classList.remove('lost');
     const lm = pointer.lm, g = pointer.g;
@@ -204,8 +205,18 @@
     // cursor follows the index fingertip, smoothed
     const pr = pinchRatio(lm);
     if (!P.pinched && !dial) { tgt.x = mapX(lm[8].x); tgt.y = mapY(lm[8].y); }
+    // on the thermostat: pinch thumb, index and middle together as if holding a knob, then twist the wrist to turn it
+    if (dial) {
+      const knuckle = h => Math.atan2((h[17].y - h[5].y) * 480, -(h[17].x - h[5].x) * 640);
+      if (triPinch(lm)) {
+        const a = knuckle(lm); P.twistSeen = now;
+        if (!P.twist) { P.twist = {a, acc: 0}; H.thermoGrip && H.thermoGrip(true); }
+        else { let da = a - P.twist.a; da = Math.atan2(Math.sin(da), Math.cos(da)); P.twist.a = a; P.twist.acc += da; while (Math.abs(P.twist.acc) >= 0.35) { const d = Math.sign(P.twist.acc); P.twist.acc -= d * 0.35; H.thermoTwist && H.thermoTwist(d); } }
+        P.pinched = true; P.onCount = 0; if (handsT[0]) handsT[0].over = true;
+      } else if (P.twist && now - (P.twistSeen || 0) > 160) { P.twist = null; H.thermoGrip && H.thermoGrip(false); }
+    } else if (P.twist) { P.twist = null; }
     // three-finger pinch = grab the open page and drag it up or down (no click)
-    if (triPinch(lm)) {
+    if (!dial && triPinch(lm)) {
       const gy = (lm[4].y + lm[8].y + lm[12].y) / 3 * innerHeight;
       const pb = document.querySelector('.panel:not([hidden]) .panel-body');
       if (P.grab !== null && pb) { const dy = gy - P.grab; if (Math.abs(dy) > 1) pb.scrollTop -= dy * 2.6; }

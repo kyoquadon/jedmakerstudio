@@ -1248,6 +1248,7 @@ const Room = (() => {
     return h0;
   }
   function thermoTurn(dir) { if (!R || !R.thermoRing) return; R.thermoTurn = (R.thermoTurn || 0) - dir * Math.PI / 12; R.thermoSpin = {from: R.thermoRing.rotation.z, to: R.thermoTurn, t0: performance.now()}; if (CFG.sound) tick(); }
+  function twist(d) { thermoTurn(d); if (window.ThermoUI) ThermoUI.turn(d); }
   function tick() { try { const ac = R.ac || (R.ac = new (window.AudioContext || window.webkitAudioContext)()); const o = ac.createOscillator(), gn = ac.createGain(); o.type = 'square'; o.frequency.value = 1800; gn.gain.setValueAtTime(0.03, ac.currentTime); gn.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + 0.04); o.connect(gn); gn.connect(ac.destination); o.start(); o.stop(ac.currentTime + 0.05); } catch (e) {} }
   function buildWorkbench() {
     const g = group('workbench'); const t = CFG.parts.desk.type;
@@ -1779,14 +1780,17 @@ const Room = (() => {
     const pickFor = (e, n) => e.pointerId === HAND_ID ? pickNear(e.clientX, e.clientY, handRad(), n) : pickAt(e.clientX, e.clientY);
     const devOn = () => R.thermoOn && R.focusSt === 'thermostat' && !R.petting;
     let knob = null, devDown = null;
-    el.addEventListener('pointerdown', e => { if (devOn()) { const h = thermoPick(e.clientX, e.clientY, e.pointerId === HAND_ID); if (h && h.part !== 'plate') { devDown = {h, sx: e.clientX, sy: e.clientY}; knob = h.part === 'ring' ? {x: e.clientX, acc: 0, turned: false} : null; try { el.setPointerCapture(e.pointerId); } catch (er) {} ac(); return; } }
+    const dialC = () => { const v = new THREE.Vector3(-4.4, 2.5, -3.925).project(R.camera); const r = el.getBoundingClientRect(); return {x: r.left + (v.x + 1) / 2 * r.width, y: r.top + (1 - v.y) / 2 * r.height}; };
+    const angAt = e => { const c = dialC(); return Math.atan2(e.clientY - c.y, e.clientX - c.x); };
+    el.addEventListener('wheel', e => { if (!devOn() || !thermoHitAt(e.clientX, e.clientY)) return; e.preventDefault(); R.wheelAcc = (R.wheelAcc || 0) + e.deltaY; if (Math.abs(R.wheelAcc) >= 60) { const d = Math.sign(R.wheelAcc); R.wheelAcc = 0; twist(d); } }, {passive: false});
+    el.addEventListener('pointerdown', e => { if (devOn()) { const h = thermoPick(e.clientX, e.clientY, e.pointerId === HAND_ID); if (h && h.part !== 'plate') { devDown = {h, sx: e.clientX, sy: e.clientY}; knob = e.pointerId === HAND_ID ? null : {a: angAt(e), acc: 0, turned: false}; try { el.setPointerCapture(e.pointerId); } catch (er) {} ac(); return; } }
       down = {x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY}; try { el.setPointerCapture(e.pointerId); } catch (er) {} ac(); if (R.ac && R.ac.state === 'suspended') R.ac.resume(); });
     el.addEventListener('pointermove', e => {
-      if (knob) { knob.acc += e.clientX - knob.x; knob.x = e.clientX; while (Math.abs(knob.acc) >= 26) { const d = Math.sign(knob.acc); knob.acc -= d * 26; knob.turned = true; thermoTurn(d); window.ThermoUI && ThermoUI.turn(d); } return; }
+      if (knob) { const a = angAt(e); let da = a - knob.a; da = Math.atan2(Math.sin(da), Math.cos(da)); knob.a = a; if (Math.hypot(e.clientX - devDown.sx, e.clientY - devDown.sy) > 10) { knob.acc += da; window.ThermoUI && ThermoUI.grip(true); } while (Math.abs(knob.acc) >= 0.32) { const d = Math.sign(knob.acc); knob.acc -= d * 0.32; knob.turned = true; twist(d); } return; }
       if (devOn() && !down) { const t = performance.now(); if (t - (R.hoverT || 0) < 40) return; R.hoverT = t; const h = thermoPick(e.clientX, e.clientY, e.pointerId === HAND_ID); el.style.cursor = h && h.part !== 'plate' ? 'pointer' : 'grab'; window.ThermoUI && ThermoUI.hover(h, e.pointerId === HAND_ID); if (h) return; }
       if (R.petting) { const h = pickAt(e.clientX, e.clientY); if (h && h.pet === R.petting.i) rubInput(e.clientX, false); return; } if (down) { const ym = R.camera.aspect < 0.8 ? 0.75 : 0.45; R.yaw = Math.max(-ym, Math.min(ym, R.yaw - (e.clientX - down.x) * 0.003)); R.pitch = Math.max(-0.2, Math.min(0.25, R.pitch + (e.clientY - down.y) * 0.002)); down.x = e.clientX; down.y = e.clientY; return; } if (e.pointerType === 'mouse') { const t = performance.now(); if (t - (R.hoverT || 0) < 50) return; R.hoverT = t; setHover(pickFor(e, 6)); } });
     el.addEventListener('pointerup', e => {
-      if (devDown) { const dd = devDown, k = knob; devDown = null; knob = null; if (Math.hypot(e.clientX - dd.sx, e.clientY - dd.sy) < 8 && !(k && k.turned)) { const h = dd.h; if (h.part === 'ring') { thermoTurn(h.side); window.ThermoUI && ThermoUI.turn(h.side); } else if (h.part === 'screen') { window.ThermoUI && ThermoUI.tap(h.x, h.y, e.pointerId === HAND_ID); } } return; }
+      if (devDown) { const dd = devDown, k = knob; devDown = null; knob = null; window.ThermoUI && ThermoUI.grip(false); if (Math.hypot(e.clientX - dd.sx, e.clientY - dd.sy) < 8 && !(k && k.turned)) { const h = dd.h; if (h.part === 'ring') twist(h.side); else if (h.part === 'screen') { window.ThermoUI && ThermoUI.tap(h.x, h.y, e.pointerId === HAND_ID); } } return; }
       const moved = down ? Math.hypot(e.clientX - down.sx, e.clientY - down.sy) : 99; down = null; if (moved < 6) { const h = pickFor(e); if (R.petting && !(h && h.pet === R.petting.i)) { endPetting(!(h && h.st)); if (!h || !h.st) return; } if (h && h.pet !== undefined) petIt(h.pet); else if (h && h.st) { Room.pulse(h.st); goto(h.st); } } });
     el.addEventListener('pointerleave', () => setHover(null));
     new ResizeObserver(resize).observe(stage); resize();
@@ -1844,6 +1848,8 @@ const Room = (() => {
     playDead() { if (R) playDead(); },
     isThermo() { return !!(R && R.thermoOn && R.focusSt === 'thermostat' && !R.petting); },
     thermoOver(x, y) { if (!R || !R.thermoOn) return false; const h = thermoPick(x, y, true); if (!h || h.part === 'plate') return false; return h.part === 'ring' || !!(window.ThermoUI && ThermoUI.zoneAt(h.x, h.y, true)); },
+    thermoTwist(d) { if (R && R.thermoOn) twist(d); },
+    thermoGrip(on) { if (window.ThermoUI) ThermoUI.grip(!!on); },
     thermoMode(on) { if (!R) return; on = !!on; if (R.thermoOn === on) return; R.thermoOn = on; if (on) setHover(null); drawThermo(); },
     thermoRedraw() { drawThermo(); },
     thermoScreen(px, py, part) { if (!R || !R.thermo) return null; const v = part === 'ring' ? new THREE.Vector3(-4.4 + px * 0.2, 2.5, -3.9) : new THREE.Vector3(-4.4 + (px / 512 * 2 - 1) * 0.18, 2.5 - (py / 512 * 2 - 1) * 0.18, -3.925); v.project(R.camera); const r = R.renderer.domElement.getBoundingClientRect(); return {x: r.left + (v.x + 1) / 2 * r.width, y: r.top + (1 - v.y) / 2 * r.height}; },
@@ -2008,126 +2014,123 @@ thermoSec.addEventListener('click', e => {
 const ThermoUI = window.ThermoUI = (() => {
   const SW = ['#ff5b4f', '#ff9a2f', '#ffc83a', '#ffe14d', '#caffbf', '#1fae7a', '#2a9d8f', '#00e0ff', '#a2d2ff', '#2f5bea', '#7b5cff', '#cdb4db', '#ff3ea5', '#ff8fc8', '#fffdf7', '#efe6cf', '#c8955c', '#8c6b4a', '#5a3e2b', '#4a4460', '#1d2030'];
   const LAMPS = [['#ffc98a', 'Warm'], ['#ffe7b0', 'Soft gold'], ['#fff4e6', 'Daylight'], ['#ffd1dc', 'Rose'], ['#c8e1ff', 'Cool blue'], ['#b8ffd9', 'Mint'], ['#ff9a5c', 'Sunset'], ['#e0c3ff', 'Lilac']];
-  const NAMES = ['Mochi', 'Kaya', 'Ollie', 'Tofu', 'Bolt', 'Pixel', 'Biscuit', 'Nori', 'Pepper', 'Kopi', 'Sago', 'Bao', 'Muffin', 'Zuzu', 'Sprocket', 'Kaya Toast', 'Chendol'];
+  const NAMES = ['Mochi', 'Kaya', 'Ollie', 'Tofu', 'Bolt', 'Pixel', 'Biscuit', 'Nori', 'Pepper', 'Kopi', 'Sago', 'Bao', 'Muffin', 'Zuzu', 'Sprocket', 'Chendol'];
   const WEATHER = [['auto', 'Singapore auto'], ['clear', 'Clear'], ['cloudy', 'Cloudy'], ['rain', 'Rain'], ['thunderstorm', 'Thunderstorm'], ['snow', 'Snow (pretend)']];
   const TIMES = [['auto', 'Match my clock'], ['dawn', 'Dawn'], ['day', 'Day'], ['dusk', 'Dusk'], ['night', 'Night']];
   const MOODS = [['cosy', 'Cosy lamp'], ['bright', 'Bright studio'], ['neon', 'Neon night'], ['moody', 'Moody']];
   const STYLES = [['square', 'Square panes'], ['arched', 'Arched'], ['round', 'Round porthole']];
-  const U = {page: 0, sel: 0, part: 0, pet: 0, hover: null, editing: false, armReset: 0};
+  const ICON = {theme: 'assets/icons/artist_palette.webp', weather: 'assets/icons/sun_cloud.webp', light: 'assets/icons/light_bulb.webp', windows: 'assets/icons/window.webp', pets: 'assets/icons/paw_prints.webp', parts: 'assets/icons/couch_lamp.webp', sound: 'assets/icons/speaker.webp'};
+  const U = {cat: 0, sub: 0, part: 0, pet: 0, hover: null, editing: false, gripping: false};
   const cyc = (list, cur, d) => { const i = Math.max(0, list.findIndex(v => (Array.isArray(v) ? v[0] : v) === cur)); const n = list[(i + d + list.length * 10) % list.length]; return Array.isArray(n) ? n[0] : n; };
   const lab = (list, cur) => (list.find(v => v[0] === cur) || [cur, cur])[1];
-  const near = (hex) => { const c = new THREE.Color(hex); let bi = 0, bd = 9; SW.forEach((s, i) => { const d = new THREE.Color(s); const dd = Math.abs(d.r - c.r) + Math.abs(d.g - c.g) + Math.abs(d.b - c.b); if (dd < bd) { bd = dd; bi = i; } }); return bi; };
+  const near = hex => { const c = new THREE.Color(hex); let bi = 0, bd = 9; SW.forEach((s, i) => { const d = new THREE.Color(s); const dd = Math.abs(d.r - c.r) + Math.abs(d.g - c.g) + Math.abs(d.b - c.b); if (dd < bd) { bd = dd; bi = i; } }); return bi; };
   const set = (fn, kind, key) => { Room.set(fn, kind, key); redraw(); };
   const say = t => notice(t);
-  function pages() {
+  function cats() {
     const C = Room.cfg(); const pk = Object.keys(PRESETS); const P = C.pets[U.pet] || C.pets[0]; const part = PART_KEYS[U.part]; const pc = C.parts[part];
     return [
-      {title: 'Theme', rows: [
-        {label: 'Room theme', value: C.preset === 'custom' ? 'Custom' : PRESETS[C.preset].label, dots: C.preset === 'custom' ? null : [0, 3, 7, 12].map(i => PRESETS[C.preset].c[i]), step: d => { const cur = C.preset === 'custom' ? pk[0] : C.preset; const nx = C.preset === 'custom' && d > 0 ? pk[0] : cyc(pk, cur, d); Room.replace(Object.assign(defaultRoomCfg(nx), {pets: C.pets, windows: C.windows, sound: C.sound, weather: C.weather, brightness: C.brightness})); redraw(); }},
-        {label: 'Surprise me', action: () => { randomRoom(); redraw(); say('Fresh room, rolled at random.'); }},
-        {label: U.armReset > performance.now() ? 'Tap again to reset' : 'Reset the room', danger: U.armReset > performance.now(), action: () => { if (U.armReset > performance.now()) { U.armReset = 0; Room.replace(Object.assign(defaultRoomCfg(), {pets: Room.cfg().pets})); say('Back to the original room.'); } else { U.armReset = performance.now() + 3000; setTimeout(redraw, 3050); } redraw(); }}]},
-      {title: 'Weather', rows: [
+      {id: 'theme', title: 'Theme', subs: [
+        {label: 'Room theme', value: C.preset === 'custom' ? 'Custom' : PRESETS[C.preset].label, dots: C.preset === 'custom' ? null : [0, 3, 7, 12].map(i => PRESETS[C.preset].c[i]), step: d => { const cur = C.preset === 'custom' ? pk[d > 0 ? pk.length - 1 : 0] : C.preset; Room.replace(Object.assign(defaultRoomCfg(cyc(pk, cur, d)), {pets: C.pets, windows: C.windows, sound: C.sound, weather: C.weather, brightness: C.brightness})); redraw(); }}]},
+      {id: 'weather', title: 'Weather', subs: [
         {label: 'Outside', value: lab(WEATHER, C.weather), step: d => set(c => { c.weather = cyc(WEATHER, c.weather, d); }, 'light')},
         {label: 'Time of day', value: lab(TIMES, C.time), step: d => set(c => { c.time = cyc(TIMES, c.time, d); }, 'light')}]},
-      {title: 'Light', rows: [
+      {id: 'light', title: 'Light', subs: [
         {label: 'Mood', value: lab(MOODS, C.mood), step: d => set(c => { c.mood = cyc(MOODS, c.mood, d); }, 'light')},
         {label: 'Brightness', value: C.brightness + '%', bar: (C.brightness - 40) / 120, step: d => set(c => { c.brightness = Math.max(40, Math.min(160, c.brightness + d * 10)); }, 'light')},
         {label: 'Lamp colour', value: (LAMPS.find(l => l[0] === C.lampColor) || ['', 'Custom'])[1], swatch: C.lampColor, step: d => set(c => { c.lampColor = cyc(LAMPS, c.lampColor, d); }, 'light')}]},
-      {title: 'Windows', rows: [
+      {id: 'windows', title: 'Windows', subs: [
         {label: 'How many', value: String(C.windows.count), step: d => set(c => { c.windows.count = Math.max(1, Math.min(4, c.windows.count + d)); }, 'type')},
         {label: 'Style', value: lab(STYLES, C.windows.style), step: d => set(c => { c.windows.style = cyc(STYLES, c.windows.style, d); }, 'type')}]},
-      {title: 'Pets', rows: [
-        {label: 'Pet', value: PET_KINDS[P.kind].label, icon: P.kind, step: d => { U.pet = (U.pet + d + C.pets.length) % C.pets.length; redraw(); }},
-        {label: 'In the room', value: P.on ? 'Yes' : 'No', toggle: P.on, step: () => { if (!P.on && C.pets.filter(p => p.on).length >= 3) { notice('Three pets is the limit, or they start a union. Send one out first.'); return; } set(c => { c.pets[U.pet].on = !c.pets[U.pet].on; }, 'pets'); }},
-        {label: 'Name', value: U.editing ? P.name + (Math.floor(performance.now() / 450) % 2 ? '|' : ' ') : P.name, name: true, step: d => { if (d > 0) set(c => { let n; do { n = NAMES[Math.floor(Math.random() * NAMES.length)]; } while (n === c.pets[U.pet].name); c.pets[U.pet].name = n; }, 'quiet'); else editName(); }}]},
-      {title: 'Pet looks', rows: [
-        {label: 'Pet', value: PET_KINDS[P.kind].label, icon: P.kind, step: d => { U.pet = (U.pet + d + C.pets.length) % C.pets.length; redraw(); }},
-        {label: 'Colour', value: '', swatch: P.color, strip: true, step: d => set(c => { c.pets[U.pet].color = SW[(near(c.pets[U.pet].color) + d + SW.length) % SW.length]; }, 'petcolor')}]},
-      {title: 'Room parts', rows: [
+      {id: 'pets', title: 'Pets', subs: [
+        {label: 'Which pet', value: P.name, icon: P.kind, step: d => { U.pet = (U.pet + d + C.pets.length) % C.pets.length; redraw(); }},
+        {label: P.name + ' in the room', value: P.on ? 'Yes' : 'No', toggle: P.on, step: () => { if (!P.on && C.pets.filter(p => p.on).length >= 3) { say('Three pets is the limit, or they start a union. Send one out first.'); return; } set(c => { c.pets[U.pet].on = !c.pets[U.pet].on; }, 'pets'); }},
+        {label: 'Name', value: U.editing ? P.name + (Math.floor(performance.now() / 450) % 2 ? '|' : ' ') : P.name, name: true, step: d => set(c => { c.pets[U.pet].name = cyc(NAMES, c.pets[U.pet].name, d); }, 'quiet')},
+        {label: P.name + "'s colour", swatch: P.color, strip: true, step: d => set(c => { c.pets[U.pet].color = SW[(near(c.pets[U.pet].color) + d + SW.length) % SW.length]; }, 'petcolor')}]},
+      {id: 'parts', title: 'Room parts', subs: [
         {label: 'Part', value: PART_LABEL[part], step: d => { U.part = (U.part + d + PART_KEYS.length) % PART_KEYS.length; redraw(); }},
-        PART_TYPES[part] ? {label: 'Style', value: cap(pc.type), step: d => set(c => { c.parts[part].type = cyc(PART_TYPES[part], c.parts[part].type, d); c.preset = 'custom'; }, 'type')} : {label: 'Style', value: 'One style only', dim: true, step: () => {}},
-        {label: 'Colour', value: '', swatch: pc.color, strip: true, step: d => set(c => { c.parts[part].color = SW[(near(c.parts[part].color) + d + SW.length) % SW.length]; c.preset = 'custom'; }, 'color', part)}]},
-      {title: 'Sound', rows: [
+        PART_TYPES[part] ? {label: PART_LABEL[part] + ' style', value: cap(pc.type), step: d => set(c => { c.parts[part].type = cyc(PART_TYPES[part], c.parts[part].type, d); c.preset = 'custom'; }, 'type')} : {label: PART_LABEL[part] + ' style', value: 'Only one style', dim: true, step: () => {}},
+        {label: PART_LABEL[part] + ' colour', swatch: pc.color, strip: true, step: d => set(c => { c.parts[part].color = SW[(near(c.parts[part].color) + d + SW.length) % SW.length]; c.preset = 'custom'; }, 'color', part)}]},
+      {id: 'sound', title: 'Sound', subs: [
         {label: 'Room sounds', value: C.sound ? 'On' : 'Off', toggle: C.sound, step: () => set(c => { c.sound = !c.sound; }, 'quiet')}]}
     ];
   }
-  // layout on the 512 px round screen
-  const RX = 76, RW = 360, RH = 78, RG = 10, RY0 = 160;
-  const rowBox = i => ({x: RX, y: RY0 + i * (RH + RG), w: RW, h: RH});
-  const zones = () => { const P = pages()[U.page]; const z = [{id: 'prev', x: 50, y: 44, w: 120, h: 100}, {id: 'next', x: 342, y: 44, w: 120, h: 100}]; P.rows.forEach((r, i) => z.push(Object.assign({id: 'row', i}, rowBox(i)))); return z; };
-  const ICONS = {}; const icon = k => { if (!ICONS[k]) { const im = new Image(); im.onload = redraw; im.src = PET_KINDS[k].icon; ICONS[k] = im; } return ICONS[k]; };
-  function fit(x, t, max, size, weight) { let s = size; do { x.font = `${weight} ${s}px Figtree, sans-serif`; s -= 2; } while (x.measureText(t).width > max && s > 12); }
-  function icn(x, k, cx, cy, col) {
-    x.save(); x.translate(cx, cy); x.strokeStyle = x.fillStyle = col; x.lineWidth = 3; x.lineCap = x.lineJoin = 'round';
-    if (k === 'pencil') { x.rotate(-Math.PI / 4); x.strokeRect(-11, -4, 18, 8); x.beginPath(); x.moveTo(7, -4); x.lineTo(13, 0); x.lineTo(7, 4); x.closePath(); x.fill(); }
-    else { rr(x, -11, -11, 22, 22, 5); x.stroke(); [[-5, -5], [5, 5], [0, 0], [5, -5], [-5, 5]].forEach(([a, b]) => { x.beginPath(); x.arc(a, b, 2.2, 0, 6.3); x.fill(); }); }
-    x.restore();
+  // layout on the 512 px round screen: category buttons around the edge, the setting in the middle
+  const BR = 186, BS = 42, CR = 128;
+  const catPos = (i, n) => { const a = -Math.PI / 2 + i / n * Math.PI * 2; return {x: 256 + Math.cos(a) * BR, y: 256 + Math.sin(a) * BR}; };
+  function zones() {
+    const all = cats(), z = all.map((c, i) => Object.assign({id: 'cat', i, r: BS + 4}, catPos(i, all.length)));
+    const s = all[U.cat].subs[U.sub]; if (s && s.name) z.push({id: 'type', x: 256, y: 332, r: 32});
+    z.push({id: 'center', x: 256, y: 256, r: CR}); return z;
   }
-  function chev(x, cx, cy, dir, s, col) { x.strokeStyle = col; x.lineWidth = Math.max(4, s * 0.45); x.lineCap = x.lineJoin = 'round'; x.beginPath(); x.moveTo(cx - dir * s * 0.35, cy - s); x.lineTo(cx + dir * s * 0.55, cy); x.lineTo(cx - dir * s * 0.35, cy + s); x.stroke(); }
+  const IMGS = {}; const img = src => { if (!IMGS[src]) { const im = new Image(); im.onload = redraw; im.src = src; IMGS[src] = im; } const im = IMGS[src]; return im.complete && im.naturalWidth ? im : null; };
+  function fit(x, t, max, size, weight) { let s = size; do { x.font = `${weight} ${s}px Figtree, sans-serif`; s -= 2; } while (x.measureText(t).width > max && s > 12); }
   function rr(x, a, b, w, h, r) { x.beginPath(); x.moveTo(a + r, b); x.arcTo(a + w, b, a + w, b + h, r); x.arcTo(a + w, b + h, a, b + h, r); x.arcTo(a, b + h, a, b, r); x.arcTo(a, b, a + w, b, r); x.closePath(); }
+  function twistIcon(x, cx, cy, col) { x.save(); x.strokeStyle = x.fillStyle = col; x.lineWidth = 3; x.lineCap = 'round'; x.beginPath(); x.arc(cx, cy, 10, Math.PI * 0.15, Math.PI * 1.7); x.stroke(); const a = Math.PI * 1.7; x.beginPath(); x.moveTo(cx + Math.cos(a) * 10 + 5, cy + Math.sin(a) * 10 - 1); x.lineTo(cx + Math.cos(a) * 10 - 2, cy + Math.sin(a) * 10 - 6); x.lineTo(cx + Math.cos(a) * 10 - 1, cy + Math.sin(a) * 10 + 4); x.closePath(); x.fill(); x.restore(); }
   function paint(x, w, h) {
-    const C = Room.cfg(); const all = pages(); U.page = Math.min(U.page, all.length - 1); const P = all[U.page]; U.sel = Math.min(U.sel, P.rows.length - 1);
+    const C = Room.cfg(); const all = cats(); U.cat = Math.min(U.cat, all.length - 1); const cat = all[U.cat]; U.sub = Math.min(U.sub, cat.subs.length - 1); const s = cat.subs[U.sub]; const hv = U.hover;
     const g = x.createRadialGradient(256, 256, 40, 256, 256, 256); g.addColorStop(0, '#2b3350'); g.addColorStop(1, '#121626'); x.fillStyle = g; x.fillRect(0, 0, w, h);
-    // brightness arc around the edge, like the passive face
-    x.lineCap = 'round'; x.lineWidth = 10; x.strokeStyle = 'rgba(255,255,255,.08)'; x.beginPath(); x.arc(256, 256, 236, Math.PI * 0.75, Math.PI * 2.25); x.stroke();
-    x.strokeStyle = C.mood === 'neon' ? '#ff3ea5' : '#ffc83a'; x.beginPath(); x.arc(256, 256, 236, Math.PI * 0.75, Math.PI * (0.75 + 1.5 * (C.brightness - 40) / 120)); x.stroke();
-    // page header with arrows and dots
-    const hv = U.hover; x.textAlign = 'center'; x.textBaseline = 'middle';
-    ['prev', 'next'].forEach(id => { const on = hv && hv.id === id, cx = id === 'prev' ? 118 : 394; x.fillStyle = on ? '#ffc83a' : 'rgba(255,255,255,.14)'; x.beginPath(); x.arc(cx, 96, 36, 0, 6.3); x.fill(); chev(x, cx, 96, id === 'prev' ? -1 : 1, 13, on ? '#1d2030' : '#fffdf7'); });
-    x.fillStyle = '#fffdf7'; fit(x, P.title, 190, 34, 800); x.fillText(P.title, 256, 92);
-    all.forEach((_, i) => { x.fillStyle = i === U.page ? '#ffc83a' : 'rgba(255,255,255,.3)'; x.beginPath(); x.arc(256 + (i - (all.length - 1) / 2) * 16, 132, i === U.page ? 5.5 : 4, 0, 6.3); x.fill(); });
-    P.rows.forEach((r, i) => {
-      const b = rowBox(i), sel = i === U.sel, hov = hv && hv.id === 'row' && hv.i === i;
-      rr(x, b.x, b.y, b.w, b.h, 16); x.fillStyle = r.danger ? 'rgba(255,91,79,.28)' : hov ? 'rgba(255,255,255,.16)' : 'rgba(255,255,255,.07)'; x.fill();
-      if (sel) { x.lineWidth = 4; x.strokeStyle = '#ffc83a'; x.stroke(); }
-      if (r.action) { x.fillStyle = r.danger ? '#ffb3ad' : '#fffdf7'; fit(x, r.label, b.w - 40, 28, 800); x.fillText(r.label, 256, b.y + b.h / 2 + 1); return; }
-      x.textAlign = 'left'; x.fillStyle = '#9fd8ff'; x.font = '700 17px Figtree, sans-serif'; x.fillText(r.label.toUpperCase(), b.x + 20, b.y + 17); x.textAlign = 'center';
-      const vy = b.y + 48, cl = b.x + 32, cr = b.x + b.w - 32, hz = hv && hv.id === 'row' && hv.i === i ? hv.zone : 0;
-      const btn = (cx, dir, glyph) => { const on = hz === dir; x.fillStyle = on ? '#ffc83a' : sel ? 'rgba(255,200,58,.25)' : 'rgba(255,255,255,.12)'; x.beginPath(); x.arc(cx, vy, 22, 0, 6.3); x.fill(); if (glyph) icn(x, glyph, cx, vy, on ? '#1d2030' : '#fffdf7'); else chev(x, cx, vy, dir, 8, on ? '#1d2030' : '#fffdf7'); };
-      if (r.name) { btn(cl, -1, 'pencil'); btn(cr, 1, 'dice'); } else if (!r.dim) { btn(cl, -1); btn(cr, 1); }
-      let vx = 256, room = b.w - 130;
-      if (r.icon) { const im = icon(r.icon); if (im.complete && im.naturalWidth) x.drawImage(im, b.x + 64, vy - 19, 38, 38); vx += 18; room -= 40; }
-      if (r.strip) { const ci = near(r.swatch); for (let k = -3; k <= 3; k++) { const s = SW[(ci + k + SW.length) % SW.length]; x.fillStyle = s; x.beginPath(); x.arc(256 + k * 36, vy, k ? 12 : 18, 0, 6.3); x.fill(); x.lineWidth = k ? 2 : 4; x.strokeStyle = k ? '#1d2030' : '#fffdf7'; x.stroke(); } return; }
-      if (r.swatch) { x.fillStyle = r.swatch; x.beginPath(); x.arc(b.x + 82, vy, 13, 0, 6.3); x.fill(); x.lineWidth = 2; x.strokeStyle = '#fffdf7'; x.stroke(); vx += 18; room -= 44; }
-      if (r.bar !== undefined) { rr(x, b.x + 66, vy - 7, b.w - 200, 14, 7); x.fillStyle = 'rgba(255,255,255,.15)'; x.fill(); rr(x, b.x + 66, vy - 7, Math.max(14, (b.w - 200) * r.bar), 14, 7); x.fillStyle = '#ffc83a'; x.fill(); x.textAlign = 'right'; x.fillStyle = '#fffdf7'; x.font = '800 22px Figtree, sans-serif'; x.fillText(r.value, b.x + b.w - 62, vy + 1); x.textAlign = 'center'; return; }
-      if (r.toggle !== undefined) { rr(x, 256 - 40, vy - 17, 80, 34, 17); x.fillStyle = r.toggle ? '#1fae7a' : 'rgba(255,255,255,.2)'; x.fill(); x.fillStyle = '#fffdf7'; x.beginPath(); x.arc(r.toggle ? 256 + 23 : 256 - 23, vy, 13, 0, 6.3); x.fill(); return; }
-      x.fillStyle = r.dim ? 'rgba(255,255,255,.45)' : '#fffdf7'; fit(x, r.value, room, 28, 800); x.fillText(r.value, vx, vy + 1);
-    });
-    x.fillStyle = 'rgba(255,255,255,.6)'; x.font = '600 19px Figtree, sans-serif'; x.fillText(U.editing ? 'Type a name, then press Enter' : 'Tap a row, turn the ring to adjust', 256, 450);
+    // brightness arc around the very edge
+    x.lineCap = 'round'; x.lineWidth = 8; x.strokeStyle = 'rgba(255,255,255,.07)'; x.beginPath(); x.arc(256, 256, 244, Math.PI * 0.75, Math.PI * 2.25); x.stroke();
+    x.strokeStyle = C.mood === 'neon' ? '#ff3ea5' : '#ffc83a'; x.beginPath(); x.arc(256, 256, 244, Math.PI * 0.75, Math.PI * (0.75 + 1.5 * (C.brightness - 40) / 120)); x.stroke();
+    // category buttons
+    all.forEach((c, i) => { const p = catPos(i, all.length), on = i === U.cat, hov = hv && hv.id === 'cat' && hv.i === i;
+      x.beginPath(); x.arc(p.x, p.y, BS, 0, 6.3); x.fillStyle = on ? '#ffc83a' : hov ? 'rgba(255,255,255,.42)' : 'rgba(255,255,255,.24)'; x.fill(); if (on) { x.lineWidth = 4; x.strokeStyle = '#fffdf7'; x.stroke(); }
+      const im = img(ICON[c.id]); if (im) x.drawImage(im, p.x - 26, p.y - 26, 52, 52); });
+    // the setting in the middle
+    const hc = hv && hv.id === 'center'; x.beginPath(); x.arc(256, 256, CR, 0, 6.3); x.fillStyle = U.gripping ? 'rgba(255,200,58,.18)' : hc ? 'rgba(255,255,255,.1)' : 'rgba(255,255,255,.04)'; x.fill();
+    x.lineWidth = 3; x.strokeStyle = U.gripping ? '#ffc83a' : 'rgba(255,255,255,.12)'; x.stroke();
+    x.textAlign = 'center'; x.textBaseline = 'middle';
+    x.fillStyle = '#9fd8ff'; fit(x, cat.title.toUpperCase(), 200, 18, 800); x.fillText(cat.title.toUpperCase(), 256, 168);
+    x.fillStyle = 'rgba(255,253,247,.8)'; fit(x, s.label, 210, 21, 700); x.fillText(s.label, 256, 200);
+    const vy = 250;
+    if (s.strip) { const ci = near(s.swatch); for (let k = -2; k <= 2; k++) { x.fillStyle = SW[(ci + k + SW.length) % SW.length]; x.beginPath(); x.arc(256 + k * 42, vy, k ? 14 : 22, 0, 6.3); x.fill(); x.lineWidth = k ? 2 : 5; x.strokeStyle = k ? '#1d2030' : '#fffdf7'; x.stroke(); } }
+    else if (s.toggle !== undefined) { rr(x, 256 - 46, vy - 20, 92, 40, 20); x.fillStyle = s.toggle ? '#1fae7a' : 'rgba(255,255,255,.2)'; x.fill(); x.fillStyle = '#fffdf7'; x.beginPath(); x.arc(s.toggle ? 256 + 26 : 256 - 26, vy, 15, 0, 6.3); x.fill(); }
+    else {
+      let vx = 256, room = 220; const im = s.icon ? img(PET_KINDS[s.icon].icon) : null; if (s.swatch || im) { vx += 22; room -= 46; }
+      x.fillStyle = s.dim ? 'rgba(255,255,255,.45)' : '#fffdf7'; fit(x, s.value, room, 34, 800); const tw = x.measureText(s.value).width; x.fillText(s.value, vx, vy);
+      if (s.swatch) { x.fillStyle = s.swatch; x.beginPath(); x.arc(vx - tw / 2 - 24, vy, 15, 0, 6.3); x.fill(); x.lineWidth = 3; x.strokeStyle = '#fffdf7'; x.stroke(); }
+      if (im) x.drawImage(im, vx - tw / 2 - 46, vy - 20, 40, 40);
+      if (s.dots) s.dots.forEach((c, k) => { x.fillStyle = c; x.beginPath(); x.arc(256 + (k - 1.5) * 22, vy + 32, 8, 0, 6.3); x.fill(); x.lineWidth = 2; x.strokeStyle = '#1d2030'; x.stroke(); });
+      if (s.bar !== undefined) { rr(x, 166, vy + 26, 180, 10, 5); x.fillStyle = 'rgba(255,255,255,.15)'; x.fill(); rr(x, 166, vy + 26, Math.max(10, 180 * s.bar), 10, 5); x.fillStyle = '#ffc83a'; x.fill(); }
+    }
+    if (s.name) { const ht = hv && hv.id === 'type'; x.beginPath(); x.arc(256, 332, 30, 0, 6.3); x.fillStyle = ht || U.editing ? '#ffc83a' : 'rgba(255,255,255,.16)'; x.fill(); x.save(); x.translate(256, 332); x.rotate(-Math.PI / 4); x.strokeStyle = x.fillStyle = ht || U.editing ? '#1d2030' : '#fffdf7'; x.lineWidth = 3; x.strokeRect(-11, -4, 17, 8); x.beginPath(); x.moveTo(6, -4); x.lineTo(12, 0); x.lineTo(6, 4); x.closePath(); x.fill(); x.restore(); }
+    else {
+      if (cat.subs.length > 1) cat.subs.forEach((_, k) => { x.fillStyle = k === U.sub ? '#ffc83a' : 'rgba(255,255,255,.3)'; x.beginPath(); x.arc(256 + (k - (cat.subs.length - 1) / 2) * 16, 300, k === U.sub ? 5.5 : 4, 0, 6.3); x.fill(); });
+      x.fillStyle = 'rgba(255,255,255,.62)'; x.font = '600 16px Figtree, sans-serif'; const hint = cat.subs.length > 1 ? 'Twist to adjust · tap for next' : 'Twist to adjust'; x.fillText(hint, 256 + 12, 330); twistIcon(x, 256 - x.measureText(hint).width / 2 - 8, 330, 'rgba(255,255,255,.62)');
+    }
+    if (U.editing) { x.fillStyle = 'rgba(255,255,255,.7)'; x.font = '600 15px Figtree, sans-serif'; x.fillText('Type a name, Enter to finish', 256, 368); }
   }
   function redraw() { Room.thermoRedraw(); }
   function zoneAt(px, py, hand) {
-    const z = zones(); const inside = z.find(r => px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h); if (inside || !hand) return inside || null;
-    let best = null, bd = 30; z.forEach(r => { const dx = Math.max(r.x - px, 0, px - r.x - r.w), dy = Math.max(r.y - py, 0, py - r.y - r.h), d = Math.hypot(dx, dy); if (d < bd) { bd = d; best = r; } }); return best;
+    const z = zones(); const inside = z.find(r => Math.hypot(px - r.x, py - r.y) <= r.r); if (inside || !hand) return inside || null;
+    let best = null, bd = 34; z.forEach(r => { const d = Math.hypot(px - r.x, py - r.y) - r.r; if (d < bd) { bd = d; best = r; } }); return best;
   }
-  function act(r, d) { if (r.action) r.action(); else r.step(d); }
+  function pickCat(i) { if (U.cat === i) return; stopEdit(); U.cat = i; U.sub = 0; redraw(); }
   function tap(px, py, hand) {
-    const z = zoneAt(px, py, hand); if (!z) return; const P = pages()[U.page];
-    if (z.id === 'prev' || z.id === 'next') { page(z.id === 'prev' ? -1 : 1); return; }
-    const r = P.rows[z.i]; U.sel = z.i; const f = (px - z.x) / z.w;
-    if (r.action) { act(r); return; }
-    if (r.name) { act(r, f > 0.8 ? 1 : -1); return; } // name: tap to type, dice on the right
-    act(r, f < 0.3 ? -1 : 1);
+    const z = zoneAt(px, py, hand); if (!z) return;
+    if (z.id === 'cat') { pickCat(z.i); return; }
+    if (z.id === 'type') { editName(); return; }
+    const cat = cats()[U.cat]; stopEdit(); if (cat.subs.length > 1) { U.sub = (U.sub + 1) % cat.subs.length; redraw(); } else turn(1);
   }
-  function page(d) { const n = pages().length; U.page = (U.page + d + n) % n; U.sel = 0; stopEdit(); redraw(); }
-  function turn(d) { const r = pages()[U.page].rows[U.sel]; if (!r) return; if (r.action) return; if (r.name) { act(r, 1); return; } r.step(d); }
+  function turn(d) { const s = cats()[U.cat].subs[U.sub]; if (s) s.step(d); }
+  function grip(on) { if (U.gripping === on) return; U.gripping = on; redraw(); }
   function button(id) { if (id === 'back') { stopEdit(); location.hash = 'room'; } else if (id === 'dice') { randomRoom(); redraw(); say('Fresh room, rolled at random.'); } else if (id === 'list') openList(); }
-  function hover(h, hand) { const z = h && h.part === 'screen' ? zoneAt(h.x, h.y, hand) : null; const key = z ? z.id + (z.i ?? '') : null; const zone = z && z.id === 'row' ? ((h.x - z.x) / z.w < 0.3 ? -1 : (h.x - z.x) / z.w > 0.7 ? 1 : 0) : 0; const k2 = key + ':' + zone; if (U.hover && U.hover.k2 === k2) return; U.hover = z ? Object.assign({key, k2, zone}, z) : null; redraw(); }
+  function hover(h, hand) { const z = h && h.part === 'screen' ? zoneAt(h.x, h.y, hand) : null; const key = z ? z.id + (z.i ?? '') : null; if ((U.hover && U.hover.key) === key) return; U.hover = z ? Object.assign({key}, z) : null; redraw(); }
   // names are typed into a real (hidden) text field and shown on the dial
   let blink = 0;
   function editName() { const inp = $('#thermoName'); U.editing = true; inp.value = Room.cfg().pets[U.pet].name; inp.focus({preventScroll: true}); inp.select(); clearInterval(blink); blink = setInterval(redraw, 450); redraw(); }
   function stopEdit() { if (!U.editing) return; U.editing = false; clearInterval(blink); const inp = $('#thermoName'); if (document.activeElement === inp) inp.blur(); redraw(); }
   function openList() { stopEdit(); S.thermoList = true; route(); }
   function key(e) {
-    const P = pages()[U.page];
-    if (e.key === 'ArrowUp') { U.sel = (U.sel - 1 + P.rows.length) % P.rows.length; redraw(); }
-    else if (e.key === 'ArrowDown') { U.sel = (U.sel + 1) % P.rows.length; redraw(); }
-    else if (e.key === 'ArrowLeft') turn(-1); else if (e.key === 'ArrowRight') turn(1);
-    else if (e.key === 'PageUp' || e.key === '[') page(-1); else if (e.key === 'PageDown' || e.key === ']') page(1);
-    else if (e.key === 'Enter' || e.key === ' ') { const r = P.rows[U.sel]; if (r.action) act(r); else if (r.name) editName(); else r.step(1); }
+    const all = cats(), cat = all[U.cat];
+    if (e.key === 'ArrowLeft') { Room.thermoTwist(-1); } else if (e.key === 'ArrowRight') { Room.thermoTwist(1); }
+    else if (e.key === 'ArrowUp') { U.sub = (U.sub - 1 + cat.subs.length) % cat.subs.length; redraw(); } else if (e.key === 'ArrowDown') { U.sub = (U.sub + 1) % cat.subs.length; redraw(); }
+    else if (e.key === 'PageUp' || e.key === '[') pickCat((U.cat - 1 + all.length) % all.length); else if (e.key === 'PageDown' || e.key === ']') pickCat((U.cat + 1) % all.length);
+    else if (/^[1-7]$/.test(e.key)) pickCat(+e.key - 1);
+    else if (e.key === 'Enter' && cat.subs[U.sub].name) editName();
     else return false; return true;
   }
-  return {paint, tap, turn, button, hover, key, zoneAt, stopEdit, editing: () => U.editing, setName: v => { Room.set(c => { c.pets[U.pet].name = v.slice(0, 20) || 'Pet'; }, 'quiet'); redraw(); }};
+  return {paint, tap, turn, grip, button, hover, key, zoneAt, stopEdit, editing: () => U.editing, setName: v => { Room.set(c => { c.pets[U.pet].name = v.slice(0, 20) || 'Pet'; }, 'quiet'); redraw(); }};
 })();
 const thermoName = $('#thermoName');
 thermoName.addEventListener('input', () => ThermoUI.setName(thermoName.value));
@@ -2216,7 +2219,7 @@ if (window.STUDIO_HOSTED) $('#importLbl').hidden = false;
   let peek = null;
   document.addEventListener('pointermove', e => { const a = e.target && e.target.closest ? e.target.closest('.room-bottom .stations a') : null; if (a === peek) return; if (peek) peek.classList.remove('peek'); peek = a; if (a) a.classList.add('peek'); });
 })();
-window.StudioHooks = {isThermo: () => Room.isThermo(), thermoOver: (x, y) => Room.thermoOver(x, y), thermoScreen: (a, b, c) => Room.thermoScreen(a, b, c), petsInfo: () => Room.petsInfo(), _petPlace: (i, x, z) => Room.petPlace(i, x, z), look: (dx, dy) => Room.look(dx, dy), zoom: f => Room.zoom(f), isPetting: () => Room.isPetting(), rubInput: (x, h) => Room.rubInput(x, h), stopPetting: () => Room.stopPetting(), stand: on => Room.stand(on), playDead: () => Room.playDead(), overPet: (x, y) => Room.overPet(x, y), trick: () => Room.trick(), petScreen: i => Room.petScreen(i || 0), notice, stations: STATIONS};
+window.StudioHooks = {thermoTwist: d => Room.thermoTwist(d), thermoGrip: on => Room.thermoGrip(on), isThermo: () => Room.isThermo(), thermoOver: (x, y) => Room.thermoOver(x, y), thermoScreen: (a, b, c) => Room.thermoScreen(a, b, c), petsInfo: () => Room.petsInfo(), _petPlace: (i, x, z) => Room.petPlace(i, x, z), look: (dx, dy) => Room.look(dx, dy), zoom: f => Room.zoom(f), isPetting: () => Room.isPetting(), rubInput: (x, h) => Room.rubInput(x, h), stopPetting: () => Room.stopPetting(), stand: on => Room.stand(on), playDead: () => Room.playDead(), overPet: (x, y) => Room.overPet(x, y), trick: () => Room.trick(), petScreen: i => Room.petScreen(i || 0), notice, stations: STATIONS};
 /* ---------- boot ---------- */
 async function migrate() {
   const local = S.localItems.filter(x => !store.items.find(y => y.id === x.id));
