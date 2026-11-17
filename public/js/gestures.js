@@ -24,35 +24,48 @@
   btn.hidden = false; if (calBtn) calBtn.hidden = false;
   let lefty = false; try { lefty = localStorage.getItem('studio-lefty') === '1'; } catch (e) {}
   let rec = null, worker = null, busy = false, video = null, stream = null, running = false, lastVT = -1; let lastRes = {landmarks: [], gestures: [], handedness: []};
-  const cur = {x: innerWidth / 2, y: innerHeight / 2}, cur2 = {x: innerWidth / 2, y: innerHeight / 2}; const hist = [];
+  const cur = {x: innerWidth / 2, y: innerHeight / 2}, cur2 = {x: innerWidth / 2, y: innerHeight / 2}; const hist = []; const tgt = {x: cur.x, y: cur.y}; let handsT = [], handsS = [], lastF = 0, lastHover = 0, hoverDue = false, ovClear = true;
   const P = {grab: null, pinched: false, onCount: 0, fistSince: 0, fistDone: false, thumbSince: 0, thumbDone: false, palm: null, petAway: 0};
   let two = null; const clapHist = []; let lastClap = 0;
   const mkCursor = () => { const c = document.createElement('div'); c.className = 'hand-cursor lost'; c.hidden = true; c.setAttribute('aria-hidden', 'true'); document.body.appendChild(c); return c; };
   const cursor = mkCursor(), cursor2 = mkCursor();
   const ov = document.createElement('canvas'); ov.id = 'handOverlay'; ov.setAttribute('aria-hidden', 'true'); ov.hidden = true; document.body.appendChild(ov);
-  const ovBuf = document.createElement('canvas'); let ovDirty = false;
+  let ovDirty = false;
   const CHAINS = [[0, 1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12], [13, 14, 15, 16], [17, 18, 19, 20]];
   // petting view: hands keep their real spacing (gain 1: the camera frame maps once across the screen)
   const petCenter = () => ({cx: C.x0 + C.xw / 2, cy: C.y0 + C.yh / 2});
   const petPalm = lm => { const {cx, cy} = petCenter(); return {x: innerWidth / 2 + ((1 - lm[9].x) - cx) * innerWidth, y: innerHeight / 2 + (lm[9].y - cy) * innerHeight}; };
   function drawHands(list) {
-    const dpr = Math.min(1.5, devicePixelRatio || 1), W = innerWidth, Hh = innerHeight;
-    if (ov.width !== Math.round(W * dpr)) { ov.width = ovBuf.width = Math.round(W * dpr); ov.height = ovBuf.height = Math.round(Hh * dpr); }
-    const x = ov.getContext('2d'), b = ovBuf.getContext('2d'); x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, ov.width, ov.height);
+    const W = innerWidth, Hh = innerHeight;
+    if (ov.width !== W || ov.height !== Hh) { ov.width = W; ov.height = Hh; }
+    const b = ov.getContext('2d'); b.clearRect(0, 0, W, Hh);
     if (!list.length) { ovDirty = false; return; }
+    b.lineCap = b.lineJoin = 'round';
     list.forEach(({lm, over}) => {
-      b.setTransform(1, 0, 0, 1, 0, 0); b.clearRect(0, 0, ovBuf.width, ovBuf.height); b.setTransform(dpr, 0, 0, dpr, 0, 0);
       const palm = petPalm(lm); const px = p => ({x: (1 - p.x) * 640, y: p.y * 480});
       const p0 = px(lm[0]), p9 = px(lm[9]); const plen = Math.min(W, Hh) * 0.17; const s = plen / (Math.hypot(p9.x - p0.x, p9.y - p0.y) || 1);
-      const scr = i => { const q = px(lm[i]); return {x: palm.x + (q.x - p9.x) * s, y: palm.y + (q.y - p9.y) * s}; };
-      const pts = lm.map((_, i) => scr(i)); const fw = plen * 0.3;
-      const path = () => { CHAINS.forEach(ch => { b.beginPath(); ch.forEach((i, k) => k ? b.lineTo(pts[i].x, pts[i].y) : b.moveTo(pts[i].x, pts[i].y)); b.stroke(); }); b.beginPath(); [0, 1, 5, 9, 13, 17].forEach((i, k) => k ? b.lineTo(pts[i].x, pts[i].y) : b.moveTo(pts[i].x, pts[i].y)); b.closePath(); b.fill(); b.stroke(); };
-      b.lineCap = b.lineJoin = 'round';
+      const pts = lm.map(q0 => { const q = px(q0); return {x: palm.x + (q.x - p9.x) * s, y: palm.y + (q.y - p9.y) * s}; }); const fw = plen * 0.3;
+      const path = () => { b.beginPath(); CHAINS.forEach(ch => ch.forEach((i, k) => k ? b.lineTo(pts[i].x, pts[i].y) : b.moveTo(pts[i].x, pts[i].y))); b.stroke(); b.beginPath(); [0, 1, 5, 9, 13, 17].forEach((i, k) => k ? b.lineTo(pts[i].x, pts[i].y) : b.moveTo(pts[i].x, pts[i].y)); b.closePath(); b.fill(); b.stroke(); };
       b.strokeStyle = b.fillStyle = '#1d2030'; b.lineWidth = fw + 6; path();
-      b.strokeStyle = b.fillStyle = over ? '#ffd2c2' : '#fff4ea'; b.lineWidth = fw; path();
-      x.globalAlpha = over ? 0.72 : 0.5; x.drawImage(ovBuf, 0, 0); x.globalAlpha = 1;
+      b.strokeStyle = b.fillStyle = over ? '#ffb59c' : '#fff4ea'; b.lineWidth = fw; path();
     });
     ovDirty = true;
+  }
+  // runs every display frame: glides the cursor and the drawn hands toward the latest camera reading
+  function frame(now) {
+    const dt = Math.min(0.1, lastF ? (now - lastF) / 1000 : 0.016); lastF = now;
+    const a = 1 - Math.exp(-16 * dt), ah = 1 - Math.exp(-20 * dt);
+    if (!cursor.hidden) {
+      const dx = tgt.x - cur.x, dy = tgt.y - cur.y;
+      if (Math.abs(dx) + Math.abs(dy) > 0.2) { cur.x += dx * a; cur.y += dy * a; place(cursor, cur); hoverDue = true; }
+      if (!P.pinched) { hist.push({x: cur.x, y: cur.y, t: now}); while (hist.length && now - hist[0].t > 400) hist.shift(); }
+      if (hoverDue && !P.pinched && now - lastHover > 33) { hoverDue = false; lastHover = now; pe('pointermove', at(cur), cur); }
+    }
+    if (handsT.length) {
+      if (handsS.length !== handsT.length) handsS = handsT.map(h => ({lm: h.lm.map(p => ({x: p.x, y: p.y})), over: h.over}));
+      else handsS.forEach((h, i) => { const T = handsT[i]; h.over = T.over; h.lm.forEach((p, j) => { p.x += (T.lm[j].x - p.x) * ah; p.y += (T.lm[j].y - p.y) * ah; }); });
+      drawHands(handsS); ovClear = false;
+    } else if (!ovClear) { handsS = []; drawHands([]); ovClear = true; }
   }
   const say = t => { status.hidden = !t; status.textContent = t || ''; };
   const help = () => `Hand control on (${lefty ? 'left' : 'right'} hand points). Point to move, pinch to click, wave an open palm to look around, pinch with both hands and pull apart to zoom or twist to turn, pinch thumb, index and middle finger together and drag to scroll, hold a fist for the room, hold a thumbs up to save, and while zoomed in on a pet: clap for a trick, make a finger gun to make it stand, then shoot for play dead. Use Calibrate if anything feels off.`;
@@ -62,7 +75,7 @@
   const mapX = x => clamp((1 - x - C.x0) / C.xw) * innerWidth, mapY = y => clamp((y - C.y0) / C.yh) * innerHeight;
   const place = (el, c) => { el.style.transform = `translate(${c.x}px, ${c.y}px)`; };
   const pe = (type, el, c) => el && el.dispatchEvent(new PointerEvent(type, {bubbles: true, cancelable: true, clientX: c.x, clientY: c.y, pointerId: 77, pointerType: 'mouse', isPrimary: true, button: 0, buttons: type === 'pointerup' ? 0 : 1}));
-  const at = c => { cursor.style.display = 'none'; cursor2.style.display = 'none'; const el = document.elementFromPoint(c.x, c.y); cursor.style.display = ''; cursor2.style.display = ''; return el; };
+  const at = c => document.elementFromPoint(c.x, c.y);
   function clickAt(c) {
     const el = at(c); if (!el) return;
     pe('pointerdown', el, c); pe('pointerup', el, c);
@@ -132,8 +145,8 @@
     const clapGrace = now - lastClap < 2500; // just after a clap, nothing can end petting
     // petting: lowering every hand for 3 seconds steps back out
     if (petting) { if (!pointer) { if (!P.petAway) P.petAway = now; else if (now - P.petAway > 3000 && !clapGrace) { P.petAway = 0; H.stopPetting && H.stopPetting(); } } else P.petAway = 0; } else P.petAway = 0;
-    cursor2.hidden = true; if (!petting && ovDirty) { drawHands([]); ov.hidden = true; } if (!petting && running && !CAL.active) cursor.hidden = false;
-    if (!pointer && petting) drawHands([]);
+    cursor2.hidden = true; if (!petting && (ovDirty || handsT.length)) { handsT = []; drawHands([]); ovClear = true; ov.hidden = true; } if (!petting && running && !CAL.active) cursor.hidden = false;
+    if (!pointer && petting) handsT = [];
     if (!pointer) { cursor.classList.add('lost'); cursor.classList.remove('grab'); P.grab = null; P.pinched = false; P.onCount = 0; P.palm = null; P.fistSince = P.thumbSince = 0; two = null; return; }
     cursor.classList.remove('lost');
     const lm = pointer.lm, g = pointer.g;
@@ -143,7 +156,7 @@
       const pal1 = petPalm(lm); cur.x += (pal1.x - cur.x) * 0.5; cur.y += (pal1.y - cur.y) * 0.5;
       const over1 = !!(H.overPet && H.overPet(cur.x, cur.y)); let over2 = false;
       if (other) { const pal2 = petPalm(other.lm); cur2.x += (pal2.x - cur2.x) * 0.5; cur2.y += (pal2.y - cur2.y) * 0.5; over2 = !!(H.overPet && H.overPet(cur2.x, cur2.y)); }
-      drawHands([{lm, over: over1}].concat(other ? [{lm: other.lm, over: over2}] : []));
+      handsT = [{lm, over: over1}].concat(other ? [{lm: other.lm, over: over2}] : []);
       if (over1) H.rubInput(cur.x, true); else if (over2) H.rubInput(cur2.x, true);
       gunCheck(pointer, other, now);
       const handsApart = !other || dist(lm[9], other.lm[9]) > C.clapFar;
@@ -160,8 +173,7 @@
     if (two) { two = null; P.pinched = true; } // keep pinch latched until the fingers open, so ending a zoom never clicks
     // cursor follows the index fingertip, smoothed
     const pr = pinchRatio(lm);
-    if (!P.pinched) { cur.x += (mapX(lm[8].x) - cur.x) * 0.35; cur.y += (mapY(lm[8].y) - cur.y) * 0.35; hist.push({x: cur.x, y: cur.y, t: now}); while (hist.length && now - hist[0].t > 400) hist.shift(); }
-    place(cursor, cur);
+    if (!P.pinched) { tgt.x = mapX(lm[8].x); tgt.y = mapY(lm[8].y); }
     // three-finger pinch = grab the open page and drag it up or down (no click)
     if (triPinch(lm)) {
       const gy = (lm[4].y + lm[8].y + lm[12].y) / 3 * innerHeight;
@@ -171,8 +183,8 @@
     } else if (P.grab !== null) { P.grab = null; cursor.classList.remove('grab'); }
     // pinch = click where the cursor was ~150 ms before the fingers met
     if (!P.pinched) {
-      if (pr < C.pinchOn && !middleNear(lm)) { if (++P.onCount >= PINCH_FRAMES) { P.pinched = true; P.onCount = 0; const back = hist.find(h => now - h.t <= 150) || hist[0] || cur; cur.x = back.x; cur.y = back.y; place(cursor, cur); cursor.classList.add('pinch'); clickAt(cur); } }
-      else { P.onCount = 0; pe('pointermove', at(cur), cur); }
+      if (pr < C.pinchOn && !middleNear(lm)) { if (++P.onCount >= PINCH_FRAMES) { P.pinched = true; P.onCount = 0; const back = hist.find(h => now - h.t <= 150) || hist[0] || cur; cur.x = tgt.x = back.x; cur.y = tgt.y = back.y; place(cursor, cur); cursor.classList.add('pinch'); clickAt(cur); } }
+      else P.onCount = 0;
     } else if (pr > C.pinchOff && P.grab === null) { P.pinched = false; cursor.classList.remove('pinch'); }
     if (G.standing) { G.standing = false; G.since = 0; } // the gun only works while zoomed in on a pet
     const gunning = [pointer, other].some(h => h && gunShape(h.lm).aim);
@@ -284,7 +296,7 @@
     (res.landmarks || []).forEach((lm, i) => { x.fillStyle = i ? '#9fd8ff' : '#ffc83a'; lm.forEach((p, j) => { x.beginPath(); x.arc(p.x * prev.width, p.y * prev.height, j === 8 || j === 4 ? 3 : 1.6, 0, 6.3); x.fill(); }); });
   }
   function loop() {
-    if (!running) return; requestAnimationFrame(loop);
+    if (!running) return; requestAnimationFrame(loop); frame(performance.now());
     if (video.readyState < 2 || video.currentTime === lastVT) return;
     if (worker) {
       if (busy) return; lastVT = video.currentTime; busy = true; const ts = performance.now();
@@ -317,14 +329,14 @@
         const fs = await FilesetResolver.forVisionTasks(MP + '/wasm');
         rec = await GestureRecognizer.createFromOptions(fs, {baseOptions: {modelAssetPath: MODEL, delegate: 'GPU'}, runningMode: 'VIDEO', numHands: 2, minHandDetectionConfidence: 0.6, minTrackingConfidence: 0.5});
       }
-      stream = await navigator.mediaDevices.getUserMedia({video: {width: 640, height: 480, facingMode: 'user'}, audio: false});
+      stream = await navigator.mediaDevices.getUserMedia({video: {width: 640, height: 480, frameRate: {ideal: 60}, facingMode: 'user'}, audio: false});
       video = video || Object.assign(document.createElement('video'), {playsInline: true, muted: true}); video.srcObject = stream; await video.play();
       running = true; window.HAND_CONTROL_ON = true; prev.hidden = false; cursor.hidden = false; setLbl('Hand control: on'); btn.setAttribute('aria-pressed', 'true'); say(help()); loop();
       const sw = document.getElementById('handSwap'); if (sw) sw.hidden = false;
     } catch (e) { console.warn(e); say(e && e.name === 'NotAllowedError' ? 'Camera permission was declined. Allow the camera for this site in your browser settings, then try again.' : 'Hand tracking could not start. Check that no other app is using the camera.'); stop(true); }
     btn.disabled = false;
   }
-  function stop(keepMsg) { running = false; busy = false; drawHands([]); ov.hidden = true; window.HAND_CONTROL_ON = false; CAL.active = false; if (calUI) calUI.hidden = true; P.pinched = false; two = null; if (stream) stream.getTracks().forEach(t => t.stop()); stream = null; prev.hidden = true; cursor.hidden = true; cursor2.hidden = true; cursor.classList.remove('petting-hand'); setLbl('Hand control: off'); btn.setAttribute('aria-pressed', 'false'); const sw = document.getElementById('handSwap'); if (sw) sw.hidden = true; if (!keepMsg) say(''); }
+  function stop(keepMsg) { running = false; busy = false; handsT = []; handsS = []; drawHands([]); ovClear = true; ov.hidden = true; window.HAND_CONTROL_ON = false; CAL.active = false; if (calUI) calUI.hidden = true; P.pinched = false; two = null; if (stream) stream.getTracks().forEach(t => t.stop()); stream = null; prev.hidden = true; cursor.hidden = true; cursor2.hidden = true; cursor.classList.remove('petting-hand'); setLbl('Hand control: off'); btn.setAttribute('aria-pressed', 'false'); const sw = document.getElementById('handSwap'); if (sw) sw.hidden = true; if (!keepMsg) say(''); }
   btn.addEventListener('click', () => running ? stop() : start());
   if (calBtn) calBtn.addEventListener('click', openCal);
   const sw = document.getElementById('handSwap');

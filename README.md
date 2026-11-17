@@ -16,7 +16,7 @@ What's in here:
 
 Cloudflare's dashboard menus get renamed now and then, so a label below might be slightly different.
 
-1. **Make the GitHub repo.** Create a private repo called `jedmakerstudio` and upload everything in this folder. Never upload a `.dev.vars` file.
+1. **Make the GitHub repo.** Create a private repo called `makers-studio-room` and upload everything in this folder. Never upload a `.dev.vars` file.
 2. **Create the database.**
    1. In the Cloudflare dashboard, go to Storage & Databases, then D1, then Create, and name it `makers-studio`.
    2. Copy its Database ID into `wrangler.toml` where it says `PASTE-YOUR-D1-DATABASE-ID-HERE`, and commit that change.
