@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Maker's Studio Room</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Figtree:wght@400;500;600;700&family=Caveat:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="room-view">
+  <header class="room-top">
+    <div class="brand"><img src="assets/icons/hammer_and_wrench.webp" alt="" width="38" height="38"><div><h1>Maker's Studio</h1><p class="hand">the room</p></div></div>
+    <div class="chips"><canvas id="handPreview" width="96" height="72" hidden aria-label="Camera preview with hand tracking dots"></canvas><button id="handBtn" class="chip" type="button" hidden aria-pressed="false">Hand control: off</button><a id="critChip" class="chip due" href="#mirror" hidden>Studio crit due</a><span id="saveChip" class="chip">Opening the studio</span><span id="aiChip" class="chip">Claude: checking</span></div>
+  </header>
+  <div id="roomStage" class="room-stage"><p id="roomFallback" class="caption" hidden>The 3D room could not load on this device. Use the buttons below to visit each station.</p></div>
+  <div class="room-bottom">
+    <p id="handStatus" class="room-caption" hidden></p>
+    <p id="roomCaption" class="room-caption">Drag to look around. Tap anything in the room to use it.</p>
+    <p id="notice" class="notice" role="status" aria-live="polite"></p>
+    <nav class="stations" aria-label="Stations">
+    <a href="#workbench" data-st="workbench"><img src="assets/icons/hammer_and_wrench.webp" alt="">Workbench</a>
+    <a href="#pinboard" data-st="pinboard"><img src="assets/icons/artist_palette.webp" alt="">Pinboard</a>
+    <a href="#corner" data-st="corner"><img src="assets/icons/speech_balloon.webp" alt="">Conversation Corner</a>
+    <a href="#machine" data-st="machine"><img src="assets/icons/gear.webp" alt="">Idea Machine</a>
+    <a href="#playground" data-st="playground"><img src="assets/icons/playground_slide.webp" alt="">Playground</a>
+    <a href="#wall" data-st="wall"><img src="assets/icons/light_bulb.webp" alt="">Sketch Wall</a>
+    <a href="#gallery" data-st="gallery"><img src="assets/icons/framed_picture.webp" alt="">Gallery</a>
+    <a href="#mirror" data-st="mirror"><img src="assets/icons/crystal_ball.webp" alt="">Voice Mirror</a>
+    <a href="#thermostat" data-st="thermostat"><img src="assets/icons/thermometer.webp" alt="">Thermostat</a>
+  </nav>
+  </div>
+</div>
+<div id="panel" class="panel" hidden role="dialog" aria-labelledby="panelTitle">
+  <div class="panel-head"><div class="brand"><img id="panelIcon" src="assets/icons/hammer_and_wrench.webp" alt="" width="34" height="34"><h2 id="panelTitle">Workbench</h2></div><button id="backRoom" class="btn btn-sm" type="button">Back to the room</button></div>
+  <div class="panel-body">
+    <div id="tally" class="chips" aria-label="Studio contents"></div>
+    <p class="notice" aria-live="polite"></p>
+  <main>
+    <!-- WORKBENCH -->
+    <section class="station" data-name="workbench" aria-labelledby="h-work">
+      <div class="grid-2">
+        <div class="sheet pad">
+          <div class="sec-head"><div><h2 id="h-work">Workbench</h2><p class="hint">Thoughts, learnings, things you noticed today.</p></div></div>
+          <div class="deck">
+            <button id="drawPrompt" class="btn btn-yellow" type="button"><img src="assets/icons/joker.webp" alt="">Draw a prompt</button>
+            <div id="promptCard" class="prompt-card"><span id="promptText" class="hand">Draw a card when you don't know where to start.</span></div>
+          </div>
+          <div class="field">
+            <label for="entryText">What's on your mind?</label>
+            <textarea id="entryText" rows="6" placeholder="Something you noticed, learned, or can't stop thinking about"></textarea>
+          </div>
+          <div class="field">
+            <span class="lbl" id="lbl-medium">Medium itch</span>
+            <div class="row" role="radiogroup" aria-labelledby="lbl-medium">
+              <label class="pick"><input type="radio" name="medium" value="physical" id="m-physical"><span>Physical</span></label>
+              <label class="pick"><input type="radio" name="medium" value="digital" id="m-digital"><span>Digital</span></label>
+              <label class="pick"><input type="radio" name="medium" value="mixed" id="m-mixed" checked><span>Mixed</span></label>
+            </div>
+          </div>
+          <div class="field">
+            <span class="lbl" id="lbl-energy">Energy</span>
+            <div class="row" role="radiogroup" aria-labelledby="lbl-energy">
+              <label class="pick"><input type="radio" name="energy" value="1" id="en-1"><span>1</span></label>
+              <label class="pick"><input type="radio" name="energy" value="2" id="en-2"><span>2</span></label>
+              <label class="pick"><input type="radio" name="energy" value="3" id="en-3" checked><span>3</span></label>
+              <label class="pick"><input type="radio" name="energy" value="4" id="en-4"><span>4</span></label>
+              <label class="pick"><input type="radio" name="energy" value="5" id="en-5"><span>5</span></label>
+            </div>
+          </div>
+          <div class="row">
+            <label class="btn btn-sm" for="entryPhoto">Attach a photo</label>
+            <input type="file" id="entryPhoto" accept="image/*" class="vh">
+            <span id="photoName" class="hint"></span>
+          </div>
+          <button id="saveEntry" class="btn btn-blue big" type="button">Pin it to the bench</button>
+        </div>
+        <div class="sheet pad">
+          <div class="sec-head"><div><h2>Journal</h2><p class="hint">Newest first. Every entry becomes material for the other stations.</p></div></div>
+          <label for="journalSearch" class="vh">Search the journal</label>
+          <input id="journalSearch" type="search" placeholder="Search entries and themes">
+          <div id="journalList" class="stack"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PINBOARD -->
+    <section class="station" data-name="pinboard" aria-labelledby="h-pin" hidden>
+      <div class="sheet pad">
+        <div class="sec-head"><div><h2 id="h-pin">Pinboard</h2><p class="hint">Collect what moves you. Pins feed the Idea Machine, Sketch Wall, Voice Mirror and your conversations.</p></div></div>
+        <div class="seg" role="group" aria-label="Pin type">
+          <button class="btn btn-sm" type="button" data-ptype="image" aria-pressed="true">Image</button>
+          <button class="btn btn-sm" type="button" data-ptype="quote" aria-pressed="false">Quote</button>
+          <button class="btn btn-sm" type="button" data-ptype="link" aria-pressed="false">Link</button>
+          <button class="btn btn-sm" type="button" data-ptype="swatch" aria-pressed="false">Colours</button>
+        </div>
+        <div class="pin-form">
+          <div data-pf="image" class="stack">
+            <label id="dropZone" class="drop" for="pinImage">Drop, paste or choose an image</label>
+            <input type="file" id="pinImage" accept="image/*" class="vh">
+            <img id="pinPreview" class="thumb" alt="Preview of the image to pin" hidden>
+          </div>
+          <div data-pf="quote" class="pin-form-grid" hidden>
+            <div class="field"><label for="pinQuote">The line</label><textarea id="pinQuote" rows="3" placeholder="A line, a phrase, something someone said"></textarea></div>
+            <div class="field"><label for="pinQuoteBy">Who said it</label><input id="pinQuoteBy" type="text" placeholder="Optional"></div>
+          </div>
+          <div data-pf="link" class="pin-form-grid" hidden>
+            <div class="field"><label for="pinUrl">Link</label><input id="pinUrl" type="url" placeholder="https://"></div>
+            <div class="field"><label for="pinLinkTitle">What is it?</label><input id="pinLinkTitle" type="text" placeholder="An artist, a video, an article"></div>
+          </div>
+          <div data-pf="swatch" class="field" hidden>
+            <span class="lbl" id="lbl-sw">Pick up to four colours</span>
+            <div class="swatch-inputs" role="group" aria-labelledby="lbl-sw">
+              <input type="color" id="sw1" value="#2f5bea" aria-label="Colour 1">
+              <input type="color" id="sw2" value="#ffc83a" aria-label="Colour 2">
+              <input type="color" id="sw3" value="#ff5b4f" aria-label="Colour 3">
+              <input type="color" id="sw4" value="#f3ead8" aria-label="Colour 4">
+            </div>
+          </div>
+          <div class="pin-form-grid">
+            <div class="field"><label for="pinNote">Why does it catch you?</label><input id="pinNote" type="text" placeholder="One line is enough"></div>
+            <div class="field"><label for="pinTags">Tags</label><input id="pinTags" type="text" placeholder="texture, night, toys"></div>
+          </div>
+          <div class="row"><button id="savePin" class="btn btn-red big" type="button">Pin it</button></div>
+        </div>
+      </div>
+      <div class="sheet pad cork">
+        <div id="pinFilters" class="row" aria-label="Filter pins"></div>
+        <div id="pinGrid" class="masonry"></div>
+      </div>
+    </section>
+
+    <!-- CORNER -->
+    <section class="station" data-name="corner" aria-labelledby="h-corner" hidden>
+      <div class="grid-corner">
+        <div class="sheet pad">
+          <h2 id="h-corner">Who's at the table?</h2>
+          <div id="personaPicks" class="stack" role="radiogroup" aria-label="Who Claude plays"></div>
+          <div class="field">
+            <label for="attachSel">Bring something to the table</label>
+            <select id="attachSel"></select>
+            <p id="attachPreview" class="mini"></p>
+          </div>
+          <div class="field">
+            <label for="threadSel">Conversations</label>
+            <select id="threadSel"></select>
+          </div>
+          <button id="newThread" class="btn btn-sm" type="button">Start a new conversation</button>
+        </div>
+        <div class="sheet pad">
+          <div class="sec-head"><div><h2>Conversation Corner</h2><p class="hint">Talk it through. Keep the good bits as sparks.</p></div></div>
+          <p id="chatOff" class="caption" hidden>Conversations need Claude, which this view can't reach. Open the studio on claude.ai while signed in, and allow Claude when it asks.</p>
+          <div id="chatLog" class="chat-log" aria-live="polite"></div>
+          <form id="chatForm" class="chat-form">
+            <label for="chatInput" class="vh">Your message</label>
+            <textarea id="chatInput" rows="2" placeholder="Think out loud. Enter sends, Shift+Enter adds a line."></textarea>
+            <button id="chatSend" class="btn btn-blue needs-ai" type="submit">Send</button>
+          </form>
+          <div class="row"><button id="catchSpark" class="btn btn-yellow needs-ai" type="button"><img src="assets/icons/light_bulb.webp" alt="">Catch a spark from this chat</button></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- MACHINE -->
+    <section class="station" data-name="machine" aria-labelledby="h-machine" hidden>
+      <div class="sheet pad">
+        <div class="sec-head"><div><h2 id="h-machine">Idea Machine</h2><p class="hint">Pick up to three scraps, set the dials, pull the lever. With nothing picked, the machine grabs two at random.</p></div></div>
+        <h3>Scrap tray</h3>
+        <div id="scrapTray" class="tray"></div>
+        <div class="dials">
+          <div class="dial"><label for="dMedium">Medium</label><select id="dMedium"></select></div>
+          <div class="dial"><label for="dAudience">Made for</label><select id="dAudience"></select></div>
+          <div class="dial"><span class="lbl">Constraint</span>
+            <div class="row"><button id="rollDie" class="btn btn-sm" type="button"><img src="assets/icons/game_die.webp" alt="">Roll</button></div>
+            <p id="constraint" class="hand"></p>
+          </div>
+        </div>
+        <button id="lever" class="lever" type="button"><span class="arm" aria-hidden="true"></span><img src="assets/icons/gear.webp" alt=""><span>Pull the lever</span></button>
+        <div id="machineOut" class="concept-out"></div>
+      </div>
+      <div class="sheet pad">
+        <div class="sec-head"><div><h2>Concept board</h2><p class="hint">Move ideas along as they become real.</p></div></div>
+        <div id="board" class="board"></div>
+      </div>
+    </section>
+
+    <!-- PLAYGROUND -->
+    <section class="station" data-name="playground" aria-labelledby="h-play" hidden>
+      <div class="sheet pad">
+        <div class="sec-head"><div><h2 id="h-play">Playground</h2><p class="hint">Warm-ups that reward trying, not polish. Ten rough minutes beats an hour of planning.</p></div><div id="streakRow" class="row"></div></div>
+      </div>
+      <div class="play-grid">
+        <div class="sheet pad">
+          <h3>Today's challenge</h3>
+          <p id="dailyText" class="hand"></p>
+          <div class="timer-row">
+            <canvas id="timerRing" role="img" aria-label="Ten minute timer"></canvas>
+            <div class="stack">
+              <p id="timerText" class="timer-num">10:00</p>
+              <div class="row"><button id="timerStart" class="btn btn-blue" type="button"><img src="assets/icons/stopwatch.webp" alt="">Start</button><button id="timerReset" class="btn btn-sm" type="button">Reset</button></div>
+            </div>
+          </div>
+          <div class="row"><button class="btn btn-yellow" type="button" data-log="challenge">Log what I made</button><button id="skipDaily" class="btn btn-sm" type="button">Give me a different one</button></div>
+        </div>
+        <div class="sheet pad">
+          <h3>Medium roulette</h3>
+          <p class="hint">Spin, then make a ten-minute study in whatever it lands on.</p>
+          <canvas id="wheel" role="img" aria-label="Medium roulette wheel"></canvas>
+          <p id="wheelResult" class="caption">Spin the wheel to get a medium and a starting point.</p>
+          <div class="row"><button id="spinBtn" class="btn btn-red" type="button">Spin</button><button class="btn btn-yellow" type="button" data-log="roulette" id="logRoulette" disabled>Log what I made</button></div>
+        </div>
+        <div class="sheet pad">
+          <h3>Make it worse</h3>
+          <p class="hint">Take something you care about and break it on purpose. It loosens the grip of good taste.</p>
+          <div class="field"><label for="worseSel">Pick something precious</label><select id="worseSel"></select></div>
+          <div class="row"><button id="worseBtn" class="btn btn-yellow" type="button">Make it worse</button></div>
+          <div id="worseOut" class="stack"></div>
+        </div>
+        <div class="sheet pad">
+          <h3>Exquisite corpse with Claude</h3>
+          <p class="hint">Take turns writing parts. Each of you only sees the last line of the part before. Unfold at the end.</p>
+          <div class="field"><label for="corpseMode">What are we making?</label><select id="corpseMode"><option value="creature">A creature</option><option value="object">An object</option><option value="story">A tiny story</option><option value="place">A place</option></select></div>
+          <div id="corpseBox" class="stack"></div>
+        </div>
+      </div>
+      <div id="logForm" class="sheet pad" hidden>
+        <h3 id="logTitle">Log a warm-up</h3>
+        <p id="logPrompt" class="hand"></p>
+        <div class="field"><label for="logMade">What did you make or try?</label><textarea id="logMade" rows="3" placeholder="Rough is good. What happened?"></textarea></div>
+        <div class="row"><label class="btn btn-sm" for="logPhoto">Attach a photo</label><input type="file" id="logPhoto" accept="image/*" class="vh"><span id="logPhotoName" class="hint"></span></div>
+        <div class="field"><label for="logFeel">How did it feel?</label><select id="logFeel"><option>Fun</option><option>Surprising</option><option>Flowing</option><option>Awkward</option><option>Frustrating</option></select></div>
+        <div class="row"><button id="logSave" class="btn btn-blue" type="button">Save to the playground</button><button id="logCancel" class="btn btn-sm" type="button">Cancel</button></div>
+      </div>
+      <div class="sheet pad">
+        <div class="sec-head"><div><h2>Sticker sheet</h2><p class="hint">Earned by experimenting, letting go and showing up. Never by being good.</p></div></div>
+        <div id="stickers" class="stickers"></div>
+      </div>
+      <div class="sheet pad">
+        <h2>Recent warm-ups</h2>
+        <div id="playList" class="play-list"></div>
+      </div>
+    </section>
+
+    <!-- GALLERY + COMPOST -->
+    <section class="station" data-name="gallery" aria-labelledby="h-gallery" hidden>
+      <div class="sheet pad">
+        <div class="sec-head"><div><h2 id="h-gallery">Gallery</h2><p class="hint">Finished pieces, each with the trail of scraps it grew from.</p></div><button id="addPieceBtn" class="btn btn-blue" type="button"><img src="assets/icons/framed_picture.webp" alt="">Hang a new piece</button></div>
+        <div id="pieceForm" class="pin-form" hidden>
+          <div class="pin-form-grid">
+            <div class="field"><label for="pcTitle">Title</label><input id="pcTitle" type="text" placeholder="Jar Study No. 2"></div>
+            <div class="field"><label for="pcMedium">Medium</label><select id="pcMedium"></select></div>
+            <div class="field"><label for="pcConcept">Grew from</label><select id="pcConcept"></select></div>
+            <div class="field"><label for="pcShown">Where it was shown</label><input id="pcShown" type="text" placeholder="Nowhere yet is fine"></div>
+          </div>
+          <div class="field"><label for="pcReflect">What surprised you while making it?</label><textarea id="pcReflect" rows="2"></textarea></div>
+          <div class="row"><label class="btn btn-sm" for="pcPhoto">Attach a photo</label><input type="file" id="pcPhoto" accept="image/*" class="vh"><span id="pcPhotoName" class="hint"></span></div>
+          <div class="row"><button id="pcSave" class="btn btn-blue" type="button">Hang it</button><button id="pcCancel" class="btn btn-sm" type="button">Cancel</button></div>
+        </div>
+        <div id="galleryWall" class="gallery"></div>
+      </div>
+      <div class="sheet pad">
+        <div class="sec-head"><div><h2>Compost Heap</h2><p class="hint">Ideas you let go of break down into rich soil. Turn the heap to grow something new from them.</p></div><button id="turnCompost" class="btn btn-green" type="button"><img src="assets/icons/seedling.webp" alt="">Turn the compost</button></div>
+        <div id="compostOut" class="stack"></div>
+        <div id="compostHeap" class="heap"></div>
+      </div>
+    </section>
+
+    <!-- THERMOSTAT -->
+    <section class="station" data-name="thermostat" aria-labelledby="h-thermo" hidden>
+      <div class="sheet pad">
+        <div class="sec-head"><div><h2 id="h-thermo">Room thermostat</h2><p class="hint">Restyle everything in the room, set the weather outside and the light inside. Changes show up live in the room.</p></div><div class="row"><button id="cfgSurprise" class="btn btn-yellow" type="button"><img src="assets/icons/game_die.webp" alt="">Surprise me</button><button id="cfgReset" class="btn btn-sm" type="button">Reset</button></div></div>
+        <h3>Themes</h3>
+        <div id="cfgPresets" class="row"></div>
+      </div>
+      <div class="grid-2">
+        <div class="sheet pad">
+          <h3>Weather and light</h3>
+          <div class="pin-form-grid">
+            <div class="field"><label for="cfgWeather">Weather outside</label><select id="cfgWeather"><option value="auto">Singapore auto</option><option value="clear">Clear</option><option value="cloudy">Cloudy</option><option value="rain">Rain</option><option value="thunderstorm">Thunderstorm</option><option value="snow">Snow (pretend)</option></select></div>
+            <div class="field"><label for="cfgTime">Time of day</label><select id="cfgTime"><option value="auto">Match my clock</option><option value="dawn">Dawn</option><option value="day">Day</option><option value="dusk">Dusk</option><option value="night">Night</option></select></div>
+            <div class="field"><label for="cfgMood">Lighting mood</label><select id="cfgMood"><option value="cosy">Cosy lamp</option><option value="bright">Bright studio</option><option value="neon">Neon night</option><option value="moody">Moody</option></select></div>
+            <div class="field"><label for="cfgLamp">Lamp colour</label><input type="color" id="cfgLamp" class="sw-in"></div>
+            <div class="field"><label for="cfgBright">Brightness</label><input type="range" id="cfgBright" min="40" max="160" step="5"></div>
+            <div class="field"><label for="cfgWinCount">Windows</label><select id="cfgWinCount"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select></div>
+            <div class="field"><label for="cfgWinStyle">Window style</label><select id="cfgWinStyle"><option value="square">Square panes</option><option value="arched">Arched</option><option value="round">Round porthole</option></select></div>
+          </div>
+          <label class="check-row" for="cfgSound"><input type="checkbox" id="cfgSound">Room sounds (pets and thunder)</label>
+        </div>
+        <div class="sheet pad">
+          <h3>Pets</h3>
+          <p class="hint">Up to three at a time. They wander, nap, play and follow you to stations. Click one in the room to give it a pat.</p>
+          <div id="petCfg" class="stack"></div>
+        </div>
+      </div>
+      <div class="sheet pad">
+        <h3>Everything in the room</h3>
+        <div id="partCfg" class="parts-grid"></div>
+      </div>
+    </section>
+    <!-- WALL -->
+    <section class="station" data-name="wall" aria-labelledby="h-wall" hidden>
+      <div class="sheet pad">
+        <div class="sec-head">
+          <div><h2 id="h-wall">Sketch Wall</h2><p class="hint">Low-fidelity pictures of your thinking, to help you imagine.</p></div>
+          <div class="seg" role="group" aria-label="Wall mode">
+            <button class="btn btn-sm" type="button" data-wm="map2d" aria-pressed="true">Thought map</button>
+            <button class="btn btn-sm" type="button" data-wm="const" aria-pressed="false">3D constellation</button>
+            <button class="btn btn-sm" type="button" data-wm="block" aria-pressed="false">3D blockout</button>
+          </div>
+        </div>
+        <div id="wallThink" class="field">
+          <label for="thinkInput">Think out loud. The map redraws as you type. Leave it empty to see your whole studio.</label>
+          <textarea id="thinkInput" rows="2" placeholder="e.g. a lamp that only lights when the room is quiet"></textarea>
+        </div>
+        <div class="canvas-box"><canvas id="map2d" role="img" aria-label="Hand-drawn thought map"></canvas><div id="three" hidden></div></div>
+        <div id="zoomRow" class="zoom" hidden>
+          <button class="btn btn-sm" type="button" data-zoom="-1">Zoom in</button>
+          <button class="btn btn-sm" type="button" data-zoom="1">Zoom out</button>
+          <button class="btn btn-sm" type="button" id="spinToggle">Pause spin</button>
+        </div>
+        <div id="blockTools" class="block-tools" hidden>
+          <div class="row"><span class="lbl">Add</span>
+            <button class="btn btn-sm" type="button" data-add="box">Box</button>
+            <button class="btn btn-sm" type="button" data-add="sphere">Sphere</button>
+            <button class="btn btn-sm" type="button" data-add="cylinder">Cylinder</button>
+            <button class="btn btn-sm" type="button" data-add="cone">Cone</button>
+            <button class="btn btn-sm" type="button" data-add="torus">Ring</button>
+            <button class="btn btn-sm" type="button" data-add="plane">Slab</button>
+          </div>
+          <div class="row"><span class="lbl">Selected shape</span>
+            <button class="btn btn-sm" type="button" data-bt="left">Left</button>
+            <button class="btn btn-sm" type="button" data-bt="right">Right</button>
+            <button class="btn btn-sm" type="button" data-bt="fwd">Away</button>
+            <button class="btn btn-sm" type="button" data-bt="back">Closer</button>
+            <button class="btn btn-sm" type="button" data-bt="up">Up</button>
+            <button class="btn btn-sm" type="button" data-bt="down">Down</button>
+            <button class="btn btn-sm" type="button" data-bt="bigger">Bigger</button>
+            <button class="btn btn-sm" type="button" data-bt="smaller">Smaller</button>
+            <button class="btn btn-sm" type="button" data-bt="turn">Turn</button>
+            <button class="btn btn-sm" type="button" data-bt="colour">Colour</button>
+            <button class="btn btn-sm" type="button" data-bt="copy">Copy</button>
+            <button class="btn btn-sm" type="button" data-bt="remove">Remove</button>
+          </div>
+          <div class="pin-form-grid">
+            <div class="field"><label for="blockName">Blockout name</label><input id="blockName" type="text" placeholder="Window jars, first pass"></div>
+            <div class="field"><label for="blockConcept">For concept</label><select id="blockConcept"></select></div>
+            <div class="field"><label for="blockLoad">Open a saved blockout</label><select id="blockLoad"></select></div>
+          </div>
+          <div class="row"><button id="blockSave" class="btn btn-blue" type="button">Save blockout</button><button id="blockNew" class="btn btn-sm" type="button">Start fresh</button></div>
+        </div>
+        <p id="wallCaption" class="caption"></p>
+      </div>
+    </section>
+
+    <!-- MIRROR -->
+    <section class="station" data-name="mirror" aria-labelledby="h-mirror" hidden>
+      <div class="grid-2">
+        <div class="sheet pad">
+          <div class="sec-head"><div><h2 id="h-mirror">Your fingerprint</h2><p class="hint">Each ring is a theme that keeps coming back. Thicker rings show up more.</p></div></div>
+          <canvas id="fp" role="img" aria-label="Fingerprint of recurring themes"></canvas>
+          <ol id="fpLegend" class="legend"></ol>
+        </div>
+        <div class="sheet pad">
+          <h2>How you make</h2>
+          <h3>Medium itch across your journal</h3>
+          <div id="mix" class="stack"></div>
+          <h3>Energy over time</h3>
+          <canvas id="spark" role="img" aria-label="Energy level across journal entries"></canvas>
+          <h3>Concepts by stage</h3>
+          <div id="stageCounts" class="row"></div>
+        </div>
+      </div>
+      <div class="sheet pad">
+        <div class="sec-head"><div><h2>Studio reading</h2><p class="hint">Claude reads your journal, pins, sparks and concepts and reflects back what it sees.</p></div><button id="readBtn" class="btn btn-blue" type="button"><img src="assets/icons/crystal_ball.webp" alt="">Read my fingerprint</button></div>
+        <div id="reading" class="reading"></div>
+        <h3>Artist statement versions</h3>
+        <ol id="statements" class="versions"></ol>
+      </div>
+      <div class="sheet pad">
+        <div class="sec-head"><div><h2>Monthly studio crit</h2><p id="critDue" class="hint"></p></div><button id="critBtn" class="btn btn-yellow" type="button"><img src="assets/icons/fallen_leaf.webp" alt="">Run this month's crit</button></div>
+        <div id="critOut" class="reading"></div>
+        <h3>Past assignments</h3>
+        <ol id="critHistory" class="versions"></ol>
+      </div>
+    </section>
+  </main>
+  <footer class="foot"><p>Icons: Microsoft Fluent Emoji (MIT). Sketch lines: Rough.js (MIT). 3D: three.js (MIT). Your studio is private to you.</p><div class="row"><button id="exportBtn" class="btn btn-sm" type="button">Export my studio</button><label id="importLbl" class="btn btn-sm" for="importFile" hidden>Import a studio file</label><input type="file" id="importFile" accept="application/json,.json" class="vh"></div></footer>
+  </div>
+</div>
+
+<script>window.STUDIO_HOSTED = true;</script>
+<script src="js/claude-shim.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/roughjs@4.6.6/bundled/rough.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="js/app.js"></script>
+<script src="js/gestures.js"></script>
+</body>
+</html>

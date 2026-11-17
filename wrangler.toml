@@ -1,0 +1,9 @@
+name = "jedmakerstudio"
+pages_build_output_dir = "public"
+compatibility_date = "2025-09-01"
+
+# Step 6 in README: create the database, then paste its id below.
+[[d1_databases]]
+binding = "DB"
+database_name = "makers-studio"
+database_id = "PASTE-YOUR-D1-DATABASE-ID-HERE"
