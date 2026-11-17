@@ -2,6 +2,9 @@
 // POST /api/claude {messages, tier: 'quick'|'default'|'complex', stream, system?}
 const json = (o, status = 200) => new Response(JSON.stringify(o), {status, headers: {'content-type': 'application/json'}});
 
+// GET /api/claude -> {ready} so the page can hide Claude features when no key is set.
+export async function onRequestGet({env}) { return json({ready: !!env.ANTHROPIC_API_KEY}); }
+
 export async function onRequestPost({request, env}) {
   if (!env.ANTHROPIC_API_KEY) return json({error: 'ANTHROPIC_API_KEY is not set for this project.'}, 503);
   const raw = await request.text();

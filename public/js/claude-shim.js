@@ -119,6 +119,8 @@
 
   const user = {id: async () => 'me', me: async () => ({id: 'me', name: 'Me'}), isOwner: () => true, canEdit: () => true, can: () => true, profiles: async () => ({})};
   let dbInst = null;
-  const caps = {db: () => (dbInst = dbInst || makeDb()), user: () => user, sample: () => sample, downloads: () => downloads};
-  window.claude = {use: name => new Promise(res => setTimeout(() => res(caps[name] ? caps[name]() : null), 0))};
+  let sampleReady = null;
+  const probeSample = () => (sampleReady = sampleReady || apiFetch('/api/claude', {headers: {accept: 'application/json'}}).then(r => r.ok ? r.json() : {ready: false}).then(j => j.ready ? sample : null).catch(() => null));
+  const caps = {db: () => (dbInst = dbInst || makeDb()), user: () => user, sample: probeSample, downloads: () => downloads};
+  window.claude = {use: name => new Promise(res => setTimeout(async () => res(caps[name] ? await caps[name]() : null), 0))};
 })();

@@ -26,7 +26,7 @@ Cloudflare's dashboard menus get renamed now and then, so a label below might be
    2. Set the framework preset to None, leave the build command empty, and set the build output directory to `public`.
    3. Deploy. Your address will be something like `jedmakerstudio.pages.dev`.
 4. **Add your secrets.** In the Pages project, go to Settings, then Variables and Secrets, and add two Secrets:
-   - `ANTHROPIC_API_KEY`: create one at console.anthropic.com and set a monthly spend limit there.
+   - `ANTHROPIC_API_KEY` (optional): create one at console.anthropic.com and set a monthly spend limit there. Without it, everything works except the Claude features (conversations, Claude-written concepts, readings and crits), which fall back to simpler built-in versions. Hand control never needs it.
    - `STUDIO_PASSCODE`: a long passphrase only you know, such as four random words. The studio asks for it once per browser, then remembers it for a year.
 
    Then redeploy: open Deployments, then the latest one, and choose Retry deployment.
