@@ -6,4 +6,4 @@ compatibility_date = "2025-09-01"
 [[d1_databases]]
 binding = "DB"
 database_name = "makers-studio"
-database_id = "PASTE-YOUR-D1-DATABASE-ID-HERE"
+database_id = "d66a1e5d-a914-4bb6-b6ef-f05b945c63fc"
