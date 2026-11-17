@@ -82,6 +82,7 @@ const EX = [
 /* ---------- state ---------- */
 const S = {station: 'workbench', sample: null, imgOK: false, prompt: '', entryPhoto: '', pinType: 'image', pinImage: '', pinFilter: '', scraps: [], persona: 'anubis', attach: '', thread: null, out: null, wallMode: 'map2d', pos: {}, block: {id: '', shapes: [], sel: -1, conceptId: ''}, constraint: pick(CONSTRAINTS), localItems: []};
 const store = {items: [], col: null, mode: 'local', queue: {}, migrated: false};
+try { S.hideEx = localStorage.getItem('makers-hide-examples') === '1'; } catch (e) { S.hideEx = false; }
 const LK = 'jed-makers-studio-v1';
 
 function loadLocal() { try { store.items = JSON.parse(localStorage.getItem(LK) || '[]'); } catch (e) { store.items = []; } S.localItems = store.items.slice(); }
@@ -115,8 +116,8 @@ function dbErr(e) {
 }
 const find = id => store.items.find(x => x.id === id) || EX.find(x => x.id === id);
 const mine = k => store.items.filter(x => x.kind === k).sort((a, b) => (b.created || 0) - (a.created || 0));
-const withEx = k => { const m = mine(k); return m.length ? m : EX.filter(x => x.kind === k); };
-const creative = () => { const m = store.items.filter(x => ['entry','pin','spark','concept','play','piece'].includes(x.kind)); return m.length ? m.sort((a, b) => (b.created || 0) - (a.created || 0)) : EX.slice(); };
+const withEx = k => { const m = mine(k); return m.length || S.hideEx ? m : EX.filter(x => x.kind === k); };
+const creative = () => { const m = store.items.filter(x => ['entry','pin','spark','concept','play','piece'].includes(x.kind)); return m.length ? m.sort((a, b) => (b.created || 0) - (a.created || 0)) : S.hideEx ? [] : EX.slice(); };
 
 function label(it) {
   if (!it) return '';
@@ -211,7 +212,7 @@ function renderTally() {
   const n = k => mine(k).length;
   const parts = [['entry', 'journal entries'], ['pin', 'pins'], ['spark', 'sparks'], ['concept', 'concepts'], ['play', 'warm-ups'], ['piece', 'pieces']];
   $('#critChip').hidden = !critStatus().due;
-  $('#tally').innerHTML = (critStatus().due ? '<a class="chip due" href="#mirror">Studio crit due</a>' : '') + parts.map(([k, l]) => `<span class="chip">${n(k)} ${l}</span>`).join('') + (store.items.length ? '' : '<span class="chip chip-ex">Showing examples until you add your own</span>');
+  $('#tally').innerHTML = (critStatus().due ? '<a class="chip due" href="#mirror">Studio crit due</a>' : '') + parts.map(([k, l]) => `<span class="chip">${n(k)} ${l}</span>`).join('') + (store.items.length || S.hideEx ? '' : '<span class="chip chip-ex">Showing examples until you add your own</span>');
 }
 
 /* ---------- workbench ---------- */
@@ -219,17 +220,19 @@ function entryCard(e) {
   return `<article class="card ${e.example ? 'is-ex' : ''}" data-id="${esc(e.id)}">
     <div class="card-top"><span class="date">${fmtDate(e.created)}</span>${e.example ? '<span class="chip chip-ex">Example</span>' : ''}<span class="chip m-${esc(e.medium)}">${esc(cap(e.medium))}</span><span class="energy" aria-label="Energy ${e.energy} of 5">${'●'.repeat(e.energy || 0)}${'○'.repeat(5 - (e.energy || 0))}</span></div>
     ${e.prompt ? `<p class="hand prompt-echo">${esc(e.prompt)}</p>` : ''}
-    ${e.text ? `<p class="wrap-text">${esc(e.text)}</p>` : ''}
+    ${S.editing === e.id ? `<label class="vh" for="edit-${esc(e.id)}">Edit entry</label><textarea id="edit-${esc(e.id)}" rows="5">${esc(e.text)}</textarea><div class="actions">${actBtn('editsave', 'Save changes', 'btn-blue')}${actBtn('editcancel', 'Cancel')}</div>` : (e.text ? `<p class="wrap-text">${esc(e.text)}</p>` : '')}
     ${isImg(e.photo) ? `<img class="thumb" src="${esc(e.photo)}" alt="Photo attached to this entry">` : ''}
     ${themeChips(e)}
-    <div class="actions">${actBtn('talk', 'Talk it through')}${actBtn('scrap', S.scraps.includes(e.id) ? 'In the Idea Machine' : 'Send to Idea Machine')}${e.example ? '' : actBtn('del', 'Delete')}</div>
+    ${S.editing === e.id ? '' : `<div class="actions">${actBtn('talk', 'Talk it through')}${actBtn('scrap', S.scraps.includes(e.id) ? 'In the Idea Machine' : 'Send to Idea Machine')}${e.example ? actBtn('hideex', 'Hide examples') : actBtn('edit', 'Edit') + actBtn('del', 'Delete')}</div>`}
   </article>`;
 }
 function renderJournal() {
   const q = $('#journalSearch').value.trim().toLowerCase();
   let list = withEx('entry');
   if (q) list = list.filter(e => ((e.text || '') + ' ' + itemThemes(e).join(' ')).toLowerCase().includes(q));
-  $('#journalList').innerHTML = list.length ? list.map(entryCard).join('') : '<p class="hint">Nothing matches that search.</p>';
+  const exNote = !mine('entry').length && !S.hideEx ? '<p class="caption">These three are examples so the studio isn\'t empty. They disappear as soon as you pin your first entry, or you can hide them now.</p>' : '';
+  $('#journalList').innerHTML = exNote + (list.length ? list.map(entryCard).join('') : (q ? '<p class="hint">Nothing matches that search.</p>' : '<p class="caption">Your journal is empty. Write your first entry and press Pin it to the bench.</p>'));
+  if (S.editing) { const ta = document.getElementById('edit-' + S.editing); if (ta && document.activeElement !== ta) ta.focus(); }
 }
 
 /* ---------- pinboard ---------- */
@@ -1691,6 +1694,10 @@ const ACTS = {
   compost: it => { it.composted = true; it.compostedAt = Date.now(); put(it); notice('Composted. It will break down into something useful.'); },
   revive: it => { it.composted = false; it.stage = 0; it.revived = (it.revived || 0) + 1; put(it); notice('Revived. It is back on the concept board as a Spark.'); },
   plant: it => { if (!S.scraps.includes(it.id)) { S.scraps.push(it.id); if (S.scraps.length > 3) S.scraps.shift(); } goto('machine'); renderAll(); },
+  edit: it => { S.editing = it.id; renderJournal(); },
+  editcancel: () => { S.editing = null; renderJournal(); },
+  editsave: it => { const ta = document.getElementById('edit-' + it.id); const t = ta ? ta.value.trim() : ''; if (!t && !it.photo) return notice('An entry needs some words or a photo.'); it.text = t; it.themes = localThemes(t, 4); S.editing = null; put(it); notice('Entry updated.'); enrich(it.id); },
+  hideex: () => { setHideEx(true); },
   sketch: it => { S.block = {id: '', shapes: clean(STARTER), sel: -1, conceptId: it.id}; $('#blockName').value = it.title + ', first pass'; S.wallMode = 'block'; goto('wall'); }
 };
 document.addEventListener('click', ev => {
@@ -1806,6 +1813,7 @@ addEventListener('hashchange', route);
 let rzT; new ResizeObserver(() => { clearTimeout(rzT); rzT = setTimeout(() => { if (S.station === 'wall' && S.wallMode === 'map2d') draw2D(); if (S.station === 'mirror') drawMirror(); if (S.station === 'playground') drawWheel(); }, 150); }).observe(document.querySelector('main'));
 
 
+function setHideEx(v) { S.hideEx = v; try { localStorage.setItem('makers-hide-examples', v ? '1' : '0'); } catch (e) {} renderAll(); notice(v ? 'Examples hidden. Bring them back from the bottom of any station.' : 'Examples are back.'); const b = $('#exToggle'); if (b) b.textContent = v ? 'Show examples' : 'Hide examples'; }
 /* ---------- export / import ---------- */
 async function exportStudio() {
   const items = store.items.filter(x => !x.example);
@@ -1828,6 +1836,8 @@ async function importStudio(file) {
   notice(n ? `Imported ${n} item${n === 1 ? '' : 's'}.` : 'Everything in that file is already here.');
 }
 $('#exportBtn').addEventListener('click', exportStudio);
+$('#exToggle').addEventListener('click', () => setHideEx(!S.hideEx));
+$('#exToggle').textContent = S.hideEx ? 'Show examples' : 'Hide examples';
 $('#importFile').addEventListener('change', e => { const f = e.target.files[0]; if (f) importStudio(f); e.target.value = ''; });
 if (window.STUDIO_HOSTED) $('#importLbl').hidden = false;
 

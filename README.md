@@ -5,10 +5,10 @@ Your 3D Maker's Studio, hosted on Cloudflare Pages, with Claude, saved data and 
 What's in here:
 
 - `public/` is the site itself: the room, the stations, the browser side of the Claude connection and storage (`js/claude-shim.js`), and hand control (`js/gestures.js`).
-- `functions/api/` holds three small server functions:
+- `functions/api/` holds four small server functions:
   - `claude.js` passes requests to Claude and keeps your API key on the server.
   - `items.js` saves and loads your studio from a D1 database.
-  - `_middleware.js` blocks anyone who isn't signed in through Cloudflare Access.
+  - `_middleware.js` and `unlock.js` (with `lib/lock.js`) keep everyone out who doesn't have your passcode.
 - `schema.sql` creates the one database table.
 - `wrangler.toml` holds the project settings.
 
@@ -25,18 +25,12 @@ Cloudflare's dashboard menus get renamed now and then, so a label below might be
    1. Go to Workers & Pages, then Create, then the Pages tab, then Connect to Git, and pick the repo.
    2. Set the framework preset to None, leave the build command empty, and set the build output directory to `public`.
    3. Deploy. Your address will be something like `jedmakerstudio.pages.dev`.
-4. **Add your secrets.**
-   1. In the Pages project, go to Settings, then Variables and Secrets, and add:
-      - `ANTHROPIC_API_KEY` as a Secret. Create the key at console.anthropic.com and set a monthly spend limit there.
-      - `ALLOWED_EMAIL`, set to your email address.
-   2. Then redeploy: open Deployments, then the latest one, and choose Retry deployment.
-5. **Lock it to you with Cloudflare Access.**
-   1. Go to Zero Trust, then Access, then Applications, then Add an application, and choose Self-hosted.
-   2. Add the domains `jedmakerstudio.pages.dev` and `*.jedmakerstudio.pages.dev`.
-   3. Add a policy: Action Allow, Include Emails, with your email.
-   4. Use One-time PIN as the login method.
+4. **Add your secrets.** In the Pages project, go to Settings, then Variables and Secrets, and add two Secrets:
+   - `ANTHROPIC_API_KEY`: create one at console.anthropic.com and set a monthly spend limit there.
+   - `STUDIO_PASSCODE`: a long passphrase only you know, such as four random words. The studio asks for it once per browser, then remembers it for a year.
 
-   Until Access is on, the site still works but saves only in that browser and Claude stays away. That's on purpose, so nobody else can spend your API credit.
+   Then redeploy: open Deployments, then the latest one, and choose Retry deployment.
+5. **Optional, a stronger lock: Cloudflare Access.** Zero Trust Free costs $0 but asks for a payment card. If you set it up, add an Access application for `jedmakerstudio.pages.dev` that allows only your email, and add `ALLOWED_EMAIL` as a variable. Both locks work together.
 6. **Bring your studio over.**
    1. In the claude.ai versions (Maker's Studio and Maker's Studio Room), open any station, scroll to the bottom and choose **Export my studio**.
    2. On the hosted site, scroll to the bottom of any station, choose **Import a studio file**, and import both files.
