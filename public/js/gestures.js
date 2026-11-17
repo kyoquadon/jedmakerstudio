@@ -133,13 +133,22 @@
     if (!cocked && now - G.lastSeen > 300) G.since = 0;
     return G.standing;
   }
+  // a clap needs two real hands: both tracked for a moment first, not one hand seen twice, and a real swing from apart to together
+  let twoSince = 0, twoLast = 0;
+  const sameHand = (a, b) => { let t = 0; for (let i = 0; i < 21; i += 4) t += dist(a[i], b[i]); return t / 6 < 0.045; };
   function detectClap(pointer, other, now) {
-    if (pointer && other) {
-      const d = dist(pointer.lm[9], other.lm[9]); clapHist.push({d, t: now}); while (clapHist.length && now - clapHist[0].t > 500) clapHist.shift();
-      if (d < C.clapNear && clapHist.some(h => h.d > C.clapFar) && now - lastClap > 1200) { lastClap = now; clapHist.length = 0; return true; }
+    const both = !!(pointer && other) && !sameHand(pointer.lm, other.lm);
+    if (both) { if (!twoSince || now - twoLast > 250) twoSince = now; twoLast = now; }
+    const steady = twoSince && twoLast - twoSince > 300; // both hands have been up for at least 0.3 s
+    const swung = () => clapHist.filter(h => h.d > C.clapFar).length >= 2;
+    if (both) {
+      const d = dist(pointer.lm[9], other.lm[9]); clapHist.push({d, t: now}); while (clapHist.length && now - clapHist[0].t > 600) clapHist.shift();
+      if (steady && d < C.clapNear && swung() && now - lastClap > 1200) { lastClap = now; clapHist.length = 0; return true; }
     } else if (clapHist.length) {
-      const last = clapHist[clapHist.length - 1];
-      if (now - last.t < 200 && last.d < (C.clapNear + C.clapFar) / 2 && clapHist.some(h => h.d > C.clapFar) && now - lastClap > 1200) { lastClap = now; clapHist.length = 0; return true; }
+      // hands that meet often merge into one detection for a frame or two
+      const last = clapHist[clapHist.length - 1], prev = clapHist[clapHist.length - 2];
+      const closing = prev && last.d < prev.d - 0.03;
+      if (steady && now - last.t < 150 && closing && last.d < C.clapNear * 1.4 && swung() && now - lastClap > 1200) { lastClap = now; clapHist.length = 0; return true; }
       if (now - last.t > 500) clapHist.length = 0;
     }
     return false;

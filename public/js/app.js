@@ -1494,9 +1494,17 @@ const Room = (() => {
   function rebuildPets() {
     if (!R) return; clearGroup(R.petsG); R.pets = []; R.pairs = {};
     CFG.pets.filter(p => p.on).slice(0, 3).forEach((cfg, i) => {
-      const m = petMesh(cfg); m.root.userData.pet = i; m.root.traverse(o => o.userData.pet = i); R.petsG.add(m.root);
+      const m = petMesh(cfg); m.deadLift = rollLift(m.root); m.root.userData.pet = i; m.root.traverse(o => o.userData.pet = i); R.petsG.add(m.root);
       const [x, z] = randFree({cfg}); R.pets.push({cfg, m, x, z, heading: Math.random() * 6, state: 'idle', until: performance.now() + 1500 + i * 800, tx: x, tz: z, after: 'idle', blinkAt: performance.now() + 2000, t0: 0, way: null});
     });
+  }
+  // how high a pet must be raised so no part of it dips below the floor when rolled onto its side by angle a
+  function rollLift(root) {
+    root.updateMatrixWorld(true); const inv = new THREE.Matrix4().copy(root.matrixWorld).invert(), mtx = new THREE.Matrix4(), v = new THREE.Vector3(), pts = [];
+    root.traverse(o => { if (!o.isMesh || !o.geometry || !o.geometry.attributes.position) return; mtx.multiplyMatrices(inv, o.matrixWorld); const a = o.geometry.attributes.position; const step = Math.max(1, Math.floor(a.count / 60)); for (let k = 0; k < a.count; k += step) { v.fromBufferAttribute(a, k).applyMatrix4(mtx); pts.push(v.x, v.y); } });
+    const N = 24, MAX = 1.8, tab = [];
+    for (let s = 0; s <= N; s++) { const th = s / N * MAX, sn = Math.sin(th), cs = Math.cos(th); let lo = 0; for (let k = 0; k < pts.length; k += 2) lo = Math.min(lo, pts[k] * sn + pts[k + 1] * cs); tab.push(-lo + 0.005); }
+    return a => { const f = Math.max(0, Math.min(N, a / MAX * N)), i0 = Math.floor(f), i1 = Math.min(N, i0 + 1); return tab[i0] + (tab[i1] - tab[i0]) * (f - i0); };
   }
   function favSpot(P) { const k = P.cfg.kind; if (k === 'otter') return [-1.9 + (Math.random() - 0.5) * 0.8, 2.6 + (Math.random() - 0.5) * 0.8]; if (k === 'dog') return [-1.9 + (Math.random() - 0.5), 1.45]; if (k === 'robot') return [1.9 + (Math.random() - 0.5) * 0.6, -2.25]; const a = Math.random() * 6.28; return [1.7 + Math.cos(a) * 0.95, 1.6 + Math.sin(a) * 0.95]; }
   function walkTo(P, x, z, after, now) {
@@ -1554,7 +1562,7 @@ const Room = (() => {
       else if (!P.deadT) { m.body.position.set(0, 0, 0); }
       let roll = 0; if (P.deadT) { const e = now - P.deadT; const ki = Math.min(1, e / 420), inK = ki < 1 ? 1 - Math.pow(1 - ki, 3) + Math.sin(ki * Math.PI) * 0.12 : 1, ko = e > 3000 ? Math.min(1, (e - 3000) / 400) : 0, outK = ko * ko * (3 - 2 * ko); roll = (Math.PI / 2) * (inK - outK); m.body.position.set(0, 0, 0); m.body.rotation.x = 0; m.head.rotation.x = 0; m.eyes.forEach(ey => ey.scale.y = outK > 0 ? 1 : 0.12); m.legs.forEach(l => l.rotation.x = 0); if (e > 3400) { P.deadT = 0; P.trickT0 = now; for (let j = 0; j < 5; j++) setTimeout(() => spawnFx('heart', P.x, 0.7, P.z), j * 90); $('#roomCaption').textContent = `${P.cfg.name} springs back up!`; if (CFG.sound) petSound(P.cfg.kind); } }
       let spin = 0; if (P.trickT0) { const k = (now - P.trickT0) / 1200; if (k < 1) { y += Math.sin(k * Math.PI) * 0.55; spin = k * Math.PI * 2; if (P.cfg.kind === 'otter') m.body.rotation.z = k * Math.PI * 2; if (P.cfg.kind === 'bunny') m.body.rotation.x = -Math.sin(k * Math.PI) * 0.6; } else { P.trickT0 = 0; m.body.rotation.z = 0; } }
-      m.root.position.set(P.x, y + (roll ? 0.06 * Math.sin(roll) : 0), P.z); m.root.rotation.set(0, P.heading + spin, roll);
+      m.root.position.set(P.x, y + (roll && m.deadLift ? m.deadLift(Math.abs(roll)) : 0), P.z); m.root.rotation.set(0, P.heading + spin, roll);
     });
     separatePets(); meetPets(now);
   }
