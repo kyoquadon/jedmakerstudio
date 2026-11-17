@@ -76,8 +76,17 @@
   const place = (el, c) => { el.style.transform = `translate(${c.x}px, ${c.y}px)`; };
   const pe = (type, el, c) => el && el.dispatchEvent(new PointerEvent(type, {bubbles: true, cancelable: true, clientX: c.x, clientY: c.y, pointerId: 77, pointerType: 'mouse', isPrimary: true, button: 0, buttons: type === 'pointerup' ? 0 : 1}));
   const at = c => document.elementFromPoint(c.x, c.y);
-  function clickAt(c) {
-    const el = at(c); if (!el) return;
+  // hand clicks forgive a near miss: if nothing clickable is right under the finger, take the closest one within a small ring
+  const CLICKABLE = 'button, a, label, input, textarea, select, [data-act], [data-scrap], [tabindex]';
+  const clickable = el => el && el.tagName !== 'CANVAS' && el.closest(CLICKABLE);
+  function nearTarget(c) {
+    const el = at(c); if (clickable(el)) return {el, c};
+    const rad = Math.max(18, Math.min(innerWidth, innerHeight) * 0.03);
+    for (const f of [0.5, 1, 1.5]) for (let k = 0; k < 8; k++) { const a = k / 8 * 6.283 + f; const q = {x: c.x + Math.cos(a) * rad * f, y: c.y + Math.sin(a) * rad * f}; const e2 = at(q); if (clickable(e2)) return {el: e2, c: q}; }
+    return {el, c}; // the room canvas does its own generous pick
+  }
+  function clickAt(c0) {
+    const {el, c} = nearTarget(c0); if (!el) return;
     pe('pointerdown', el, c); pe('pointerup', el, c);
     if (el.tagName !== 'CANVAS') { const t = el.closest('button, a, label, input, textarea, select, [data-act], [data-scrap], [tabindex]') || el; if (t.matches('input[type=text], input[type=url], input[type=search], input[type=password], textarea')) t.focus(); else t.click(); }
     cursor.classList.add('click'); setTimeout(() => cursor.classList.remove('click'), 180);

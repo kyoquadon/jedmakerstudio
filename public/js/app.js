@@ -1449,7 +1449,7 @@ const Room = (() => {
   }
   function free(x, z, P) { if (x < -4.6 || x > 4.6 || z < -3.6 || z > 3.6) return false; return !R.obstacles.some(([x0, x1, z0, z1, tag]) => x > x0 - 0.12 && x < x1 + 0.12 && z > z0 - 0.12 && z < z1 + 0.12 && !(tag === 'pit' && P && P.cfg.kind === 'otter')); }
   function clearLine(x0, z0, x1, z1, P) { const d = Math.hypot(x1 - x0, z1 - z0); const n = Math.ceil(d / 0.15); for (let i = 1; i <= n; i++) { const t = i / n; if (!free(x0 + (x1 - x0) * t, z0 + (z1 - z0) * t, P)) return false; } return true; }
-  function randFree(P) { for (let i = 0; i < 40; i++) { const x = (Math.random() - 0.5) * 9, z = (Math.random() - 0.5) * 7; if (free(x, z, P)) return [x, z]; } return [0.5, 0]; }
+  function randFree(P) { let fb = null; for (let i = 0; i < 40; i++) { const x = (Math.random() - 0.5) * 9, z = (Math.random() - 0.5) * 7; if (!free(x, z, P)) continue; if (!fb) fb = [x, z]; if (!(R.pets || []).some(Q => Q !== P && Math.hypot(Q.x - x, Q.z - z) < 0.7)) return [x, z]; } return fb || [0.5, 0]; }
   function petMesh(cfg) {
     R.petBuild = true;
     const k = cfg.kind, c = cfg.color, acc = shade(c, 0.18), dark = shade(c, -0.2);
@@ -1492,7 +1492,7 @@ const Room = (() => {
     return P;
   }
   function rebuildPets() {
-    if (!R) return; clearGroup(R.petsG); R.pets = [];
+    if (!R) return; clearGroup(R.petsG); R.pets = []; R.pairs = {};
     CFG.pets.filter(p => p.on).slice(0, 3).forEach((cfg, i) => {
       const m = petMesh(cfg); m.root.userData.pet = i; m.root.traverse(o => o.userData.pet = i); R.petsG.add(m.root);
       const [x, z] = randFree({cfg}); R.pets.push({cfg, m, x, z, heading: Math.random() * 6, state: 'idle', until: performance.now() + 1500 + i * 800, tx: x, tz: z, after: 'idle', blinkAt: performance.now() + 2000, t0: 0, way: null});
@@ -1519,9 +1519,11 @@ const Room = (() => {
       const m = P.m; const sp = PET_KINDS[P.cfg.kind].speed;
       if (P.state === 'walk') {
         const dx = P.tx - P.x, dz = P.tz - P.z, d = Math.hypot(dx, dz);
-        if (d < 0.06) { if (P.way) { const [wx, wz] = P.way; P.way = null; P.tx = wx; P.tz = wz; } else arrive(P, now); }
+        const blocker = d < 0.6 && !P.way && R.pets.find(Q => Q !== P && Q.state !== 'walk' && Math.hypot(Q.x - P.tx, Q.z - P.tz) < petR(P) + petR(Q) + 0.05);
+        if (!P.stuckT || d < P.stuckD - 0.05) { P.stuckT = now; P.stuckD = d; } else if (now - P.stuckT > 1500) { P.stuckT = 0; walkTo(P, ...randFree(P), P.after === 'sleep' ? 'sleep' : 'idle', now); }
+        if (d < 0.06 || (blocker && d < Math.hypot(blocker.x - P.tx, blocker.z - P.tz) + 0.2)) { P.stuckT = 0; if (P.way) { const [wx, wz] = P.way; P.way = null; P.tx = wx; P.tz = wz; } else arrive(P, now); }
         else { const step = Math.min(d, sp * dt); const nx = P.x + dx / d * step, nz = P.z + dz / d * step; if (free(nx, nz, P)) { P.x = nx; P.z = nz; } else { walkTo(P, ...randFree(P), 'idle', now); } const want = Math.atan2(dx, dz); let dh = want - P.heading; dh = Math.atan2(Math.sin(dh), Math.cos(dh)); P.heading += dh * Math.min(1, dt * 8); }
-      } else if (now > P.until) { if (P.state === 'happy' && P.resume) { P.resume = false; } nextAction(P, now); }
+      } else if (P.state === 'inter' && now <= P.until) { interMove(P, i, dt, now); } else if (now > P.until) { if (P.state === 'happy' && P.resume) { P.resume = false; } if (P.inter) { P.inter = null; P.state = 'idle'; P.until = now + 800 + Math.random() * 1200; } else nextAction(P, now); }
       const walking = P.state === 'walk', t = now / 1000;
       let y = (P.cfg.kind === 'otter' && P.x > -2.7 && P.x < -1.1 && P.z > 1.85 && P.z < 3.35) ? 0.08 : 0;
       const sw = walking ? Math.sin(t * 10 * sp) * 0.6 : 0;
@@ -1541,6 +1543,7 @@ const Room = (() => {
         if (m.tail) m.tail.rotation.y = Math.sin(t * (6 + 14 * amt)) * 0.5;
         m.ears.forEach(e => e.rotation.z = (e.userData.base || 0) + (e.userData.sx || 0) * 0.25 * amt);
       }
+      else if (P.state === 'inter' && P.inter) { interPose(P, m, t, now, (v) => { y += v; }); }
       else if (P.state === 'sleep') { m.body.scale.y = 0.82; m.head.rotation.x = 0.45; m.eyes.forEach(e => e.scale.y = 0.15); if (!reduceMotion && now > (P.bub || 0)) { P.bub = now + 1400; spawnFx('bubble', P.x, 0.5, P.z); } }
       else if (P.state === 'happy') { const k = (now - P.t0) / 1200; y += Math.abs(Math.sin(k * Math.PI * 3)) * 0.18 * (1 - Math.min(1, k)); if (P.cfg.kind === 'dog' || P.cfg.kind === 'robot') P.heading += dt * 7 * (1 - Math.min(1, k)); m.eyes.forEach(e => e.scale.y = P.cfg.kind === 'robot' ? 1 : 0.4); }
       else if (P.state === 'play') { const k = now / 1000; if (P.cfg.kind === 'otter') P.heading += dt * 3; else if (P.cfg.kind === 'bunny') { y += Math.abs(Math.sin(k * 5)) * 0.2; m.body.rotation.y = Math.sin(k * 5) * 0.6; } else if (P.cfg.kind === 'cat') { y += Math.max(0, Math.sin(k * 3)) * 0.12; } else P.heading += dt * 2.5; }
@@ -1553,7 +1556,90 @@ const Room = (() => {
       let spin = 0; if (P.trickT0) { const k = (now - P.trickT0) / 1200; if (k < 1) { y += Math.sin(k * Math.PI) * 0.55; spin = k * Math.PI * 2; if (P.cfg.kind === 'otter') m.body.rotation.z = k * Math.PI * 2; if (P.cfg.kind === 'bunny') m.body.rotation.x = -Math.sin(k * Math.PI) * 0.6; } else { P.trickT0 = 0; m.body.rotation.z = 0; } }
       m.root.position.set(P.x, y + (roll ? 0.06 * Math.sin(roll) : 0), P.z); m.root.rotation.set(0, P.heading + spin, roll);
     });
+    separatePets(); meetPets(now);
   }
+  // --- pets share the floor: they never overlap, and meeting another pet usually starts something ---
+  const PET_R = {cat: 0.2, dog: 0.24, otter: 0.22, bunny: 0.18, robot: 0.22};
+  function petR(P) { return PET_R[P.cfg.kind] || 0.2; }
+  function pinned(P, i) { return (R.petting && R.petting.i === i) || P.deadT || P.stand; }
+  function separatePets() {
+    const L = R.pets; if (!L || L.length < 2) return;
+    for (let pass = 0; pass < 2; pass++) for (let i = 0; i < L.length; i++) for (let j = i + 1; j < L.length; j++) {
+      const A = L[i], B = L[j]; let dx = B.x - A.x, dz = B.z - A.z, d = Math.hypot(dx, dz); const min = petR(A) + petR(B);
+      if (d >= min) continue; if (d < 1e-4) { const a = Math.random() * 6.28; dx = Math.cos(a); dz = Math.sin(a); d = 1; } const o = min - d, nx = dx / d, nz = dz / d;
+      const mob = (P, k) => pinned(P, k) ? 0 : (P.state === 'walk' || P.state === 'inter' ? 1 : 0.35);
+      let wa = mob(A, i), wb = mob(B, j); if (!wa && !wb) continue; const s = wa + wb; wa /= s; wb /= s;
+      const ax = A.x - nx * o * wa, az = A.z - nz * o * wa, bx = B.x + nx * o * wb, bz = B.z + nz * o * wb;
+      const okA = !wa || free(ax, az, A), okB = !wb || free(bx, bz, B);
+      if (okA && okB) { A.x = ax; A.z = az; B.x = bx; B.z = bz; }
+      else if (okA && wa) { A.x -= nx * o; A.z -= nz * o; if (!free(A.x, A.z, A)) { A.x += nx * o; A.z += nz * o; } }
+      else if (okB && wb) { B.x += nx * o; B.z += nz * o; if (!free(B.x, B.z, B)) { B.x -= nx * o; B.z -= nz * o; } }
+    }
+  }
+  const INTER = {
+    sniff: {dur: 3200, say: (a, b) => `${a} and ${b} sniff hello.`},
+    nuzzle: {dur: 3000, say: (a, b) => `${a} nuzzles up to ${b}.`},
+    chase: {dur: 4800, say: (a, b) => `${b} chases ${a} around!`},
+    dance: {dur: 4200, say: (a, b) => `${a} and ${b} do a little happy dance.`},
+    bounce: {dur: 3200, say: (a, b) => `${a} and ${b} hop about together.`}
+  };
+  const KIND_SAY = {robot: (a, b) => `${a} scans ${b}. Result: friend.`, otter: (a, b) => `${a} shows ${b} a very good pebble.`};
+  const available = (P, i) => ['idle', 'sit', 'play', 'walk'].includes(P.state) && P.after !== 'sleep' && !pinned(P, i) && !P.trickT0 && !P.inter;
+  function meetPets(now) {
+    const L = R.pets; if (!L || L.length < 2) return; R.pairs = R.pairs || {};
+    for (let i = 0; i < L.length; i++) for (let j = i + 1; j < L.length; j++) {
+      const A = L[i], B = L[j], key = i + '-' + j, pr = R.pairs[key] || (R.pairs[key] = {met: false, cool: 0}); const d = Math.hypot(B.x - A.x, B.z - A.z);
+      if (d > 1.4) { pr.met = false; continue; }
+      if (d > 0.9 || pr.met || now < pr.cool) continue;
+      if (!available(A, i) || !available(B, j)) continue;
+      pr.met = true; // one roll per meeting: walk apart and back to roll again
+      if (Math.random() < 0.7) startInter(A, B, now, pr);
+    }
+  }
+  function circleFree(cx, cz, r, P) { for (let k = 0; k < 10; k++) { const a = k / 10 * 6.283; if (!free(cx + Math.cos(a) * r, cz + Math.sin(a) * r, P)) return false; } return true; }
+  function startInter(A, B, now, pr) {
+    const kinds = Object.keys(INTER); let type = kinds[Math.floor(Math.random() * kinds.length)];
+    const mx = (A.x + B.x) / 2, mz = (A.z + B.z) / 2, r = type === 'chase' ? 0.7 : 0.36;
+    if ((type === 'chase' || type === 'dance') && !(circleFree(mx, mz, r, A) && circleFree(mx, mz, r, B))) type = Math.random() < 0.5 ? 'sniff' : 'bounce';
+    if (Math.random() < 0.5) { const t = A; A = B; B = t; }
+    const dur = INTER[type].dur, a0 = Math.atan2(A.z - mz, A.x - mx);
+    [[A, B, 'a'], [B, A, 'b']].forEach(([P, Q, role]) => { P.inter = {type, other: Q, role, t0: now, mid: [mx, mz], r, a0}; P.state = 'inter'; P.until = now + dur; P.way = null; P.stuckT = 0; });
+    pr.cool = now + dur + 12000;
+    const ks = KIND_SAY[A.cfg.kind]; const line = (ks && Math.random() < 0.5 && type === 'sniff') ? ks(A.cfg.name, B.cfg.name) : INTER[type].say(A.cfg.name, B.cfg.name);
+    if (!R.petting) { const c = $('#roomCaption'); if (c) c.textContent = line; }
+    if (type === 'nuzzle' || type === 'dance') for (let k = 0; k < 3; k++) setTimeout(() => spawnFx('heart', mx, 0.6, mz), 300 + k * 260);
+    if (CFG.sound && (type === 'chase' || type === 'bounce')) petSound(A.cfg.kind);
+  }
+  function stepTo(P, x, z, speed, dt, face) {
+    const dx = x - P.x, dz = z - P.z, d = Math.hypot(dx, dz);
+    if (d > 0.01) { const st = Math.min(d, speed * dt), nx = P.x + dx / d * st, nz = P.z + dz / d * st; if (free(nx, nz, P)) { P.x = nx; P.z = nz; } }
+    const want = face !== undefined ? face : Math.atan2(dx, dz); let dh = want - P.heading; dh = Math.atan2(Math.sin(dh), Math.cos(dh)); P.heading += dh * Math.min(1, dt * 8);
+    return d;
+  }
+  function interMove(P, i, dt, now) {
+    const I = P.inter, Q = I.other; if (!Q || Q.state !== 'inter' || !Q.inter || Q.inter.other !== P) { P.until = now; return; } // partner got picked up or called away
+    const sp = PET_KINDS[P.cfg.kind].speed, k = (now - I.t0) / 1000, face = Math.atan2(Q.x - P.x, Q.z - P.z);
+    if (I.type === 'chase' || I.type === 'dance') {
+      const w = I.type === 'chase' ? 2.1 : 1.5, lag = I.type === 'chase' ? (I.role === 'a' ? 0 : -1.1) : (I.role === 'a' ? 0 : Math.PI);
+      const ang = I.a0 + w * k + lag, tx = I.mid[0] + Math.cos(ang) * I.r, tz = I.mid[1] + Math.sin(ang) * I.r;
+      stepTo(P, tx, tz, Math.max(1.4, sp * 2.4), dt, I.type === 'dance' ? face : undefined); P.moving = true;
+    } else {
+      const gap = petR(P) + petR(Q) + (I.type === 'nuzzle' ? 0.02 : 0.1), d = Math.hypot(Q.x - P.x, Q.z - P.z);
+      if (d > gap + 0.03) { stepTo(P, P.x + (Q.x - P.x) * (1 - gap / d), P.z + (Q.z - P.z) * (1 - gap / d), sp, dt, face); P.moving = true; }
+      else { stepTo(P, P.x, P.z, 0, dt, face); P.moving = false; }
+    }
+  }
+  function interPose(P, m, t, now, addY) {
+    const I = P.inter, k = (now - I.t0) / 1000, ph = I.role === 'a' ? 0 : Math.PI;
+    if (P.moving && P.cfg.kind !== 'robot' && P.cfg.kind !== 'otter') { const sw = Math.sin(t * 16) * 0.7; m.legs.forEach((l, j) => l.rotation.x = (j % 2 === (j < 2 ? 0 : 1) ? sw : -sw)); }
+    if (I.type === 'sniff') { m.head.rotation.x = 0.2 + Math.sin(t * 9) * 0.12; if (P.cfg.kind === 'robot') m.head.rotation.y = Math.sin(t * 4) * 0.6; }
+    else if (I.type === 'nuzzle') { m.head.rotation.z = Math.sin(t * 5 + ph) * 0.25; m.head.rotation.x = 0.1; if (P.cfg.kind !== 'robot') m.eyes.forEach(e => e.scale.y = 0.3); }
+    else if (I.type === 'chase') { addY(Math.abs(Math.sin(t * 11)) * 0.06); }
+    else if (I.type === 'dance') { addY(Math.abs(Math.sin(k * 6 + ph)) * 0.14); m.body.rotation.z = Math.sin(k * 6 + ph) * 0.12; }
+    else if (I.type === 'bounce') { addY(Math.max(0, Math.sin(k * 5 + ph)) * 0.22); m.head.rotation.x = -0.15; }
+    if (m.tail) m.tail.rotation.y = Math.sin(t * 16) * 0.55;
+  }
+
   function petIt(i) { startPetting(i); }
   function startPetting(i) {
     const P = R.pets[i]; if (!P) return; if (R.petting && R.petting.i === i) return; if (R.petting) endPetting(true);
@@ -1652,9 +1738,12 @@ const Room = (() => {
     rebuildAll(); rebuildPets(); drawSky(0);
     const el = renderer.domElement; let down = null; const ray = new THREE.Raycaster(); const v2 = new THREE.Vector2();
     const pickAt = R.pickAt = (cx, cy) => { const r = el.getBoundingClientRect(); v2.set(((cx - r.left) / r.width) * 2 - 1, -((cy - r.top) / r.height) * 2 + 1); ray.setFromCamera(v2, camera); const ph = ray.intersectObjects(R.petsG.children, true)[0]; if (ph && ph.object.userData.pet !== undefined) return {pet: ph.object.userData.pet}; const hits = ray.intersectObjects(Object.values(R.groups), true); for (const h of hits) { let o = h.object; while (o && !o.userData.station) o = o.parent; if (o) return {st: o.userData.station}; } return null; };
+    const HAND_ID = 77; const handRad = () => Math.max(22, Math.min(innerWidth, innerHeight) * 0.04);
+    const pickNear = R.pickNear = (cx, cy, rad, n) => { const h0 = pickAt(cx, cy); if (h0) return h0; n = n || 8; for (const f of [0.5, 1]) for (let k = 0; k < n; k++) { const a = k / n * 6.283 + f; const h = pickAt(cx + Math.cos(a) * rad * f, cy + Math.sin(a) * rad * f); if (h) return h; } return null; };
+    const pickFor = (e, n) => e.pointerId === HAND_ID ? pickNear(e.clientX, e.clientY, handRad(), n) : pickAt(e.clientX, e.clientY);
     el.addEventListener('pointerdown', e => { down = {x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY}; try { el.setPointerCapture(e.pointerId); } catch (er) {} ac(); if (R.ac && R.ac.state === 'suspended') R.ac.resume(); });
-    el.addEventListener('pointermove', e => { if (R.petting) { const h = pickAt(e.clientX, e.clientY); if (h && h.pet === R.petting.i) rubInput(e.clientX, false); return; } if (down) { const ym = R.camera.aspect < 0.8 ? 0.75 : 0.45; R.yaw = Math.max(-ym, Math.min(ym, R.yaw - (e.clientX - down.x) * 0.003)); R.pitch = Math.max(-0.2, Math.min(0.25, R.pitch + (e.clientY - down.y) * 0.002)); down.x = e.clientX; down.y = e.clientY; return; } if (e.pointerType === 'mouse') { const t = performance.now(); if (t - (R.hoverT || 0) < 50) return; R.hoverT = t; setHover(pickAt(e.clientX, e.clientY)); } });
-    el.addEventListener('pointerup', e => { const moved = down ? Math.hypot(e.clientX - down.sx, e.clientY - down.sy) : 99; down = null; if (moved < 6) { const h = pickAt(e.clientX, e.clientY); if (R.petting && !(h && h.pet === R.petting.i)) { endPetting(!(h && h.st)); if (!h || !h.st) return; } if (h && h.pet !== undefined) petIt(h.pet); else if (h && h.st) { Room.pulse(h.st); goto(h.st); } } });
+    el.addEventListener('pointermove', e => { if (R.petting) { const h = pickAt(e.clientX, e.clientY); if (h && h.pet === R.petting.i) rubInput(e.clientX, false); return; } if (down) { const ym = R.camera.aspect < 0.8 ? 0.75 : 0.45; R.yaw = Math.max(-ym, Math.min(ym, R.yaw - (e.clientX - down.x) * 0.003)); R.pitch = Math.max(-0.2, Math.min(0.25, R.pitch + (e.clientY - down.y) * 0.002)); down.x = e.clientX; down.y = e.clientY; return; } if (e.pointerType === 'mouse') { const t = performance.now(); if (t - (R.hoverT || 0) < 50) return; R.hoverT = t; setHover(pickFor(e, 6)); } });
+    el.addEventListener('pointerup', e => { const moved = down ? Math.hypot(e.clientX - down.sx, e.clientY - down.sy) : 99; down = null; if (moved < 6) { const h = pickFor(e); if (R.petting && !(h && h.pet === R.petting.i)) { endPetting(!(h && h.st)); if (!h || !h.st) return; } if (h && h.pet !== undefined) petIt(h.pet); else if (h && h.st) { Room.pulse(h.st); goto(h.st); } } });
     el.addEventListener('pointerleave', () => setHover(null));
     new ResizeObserver(resize).observe(stage); resize();
     let last = performance.now(), skyT = 0;
@@ -1704,10 +1793,12 @@ const Room = (() => {
     focus(st, fromPet) { if (!R) return; if (R.petting && !fromPet) endPetting(true); R.focusSt = st || null; R.tw = {from: {pos: R.cur.pos.clone(), tgt: R.cur.tgt.clone()}, to: viewFor(st), t0: performance.now(), dur: reduceMotion ? 1 : 1100}; R.yaw = 0; R.pitch = 0; R.zoomF = 1; if (fromPet) R.hover = null; else setHover(null); if (st && SPOT[st] && R.pets.length && Math.random() < 0.7) { const P = R.pets[0]; if (P.state !== 'sleep') walkTo(P, SPOT[st][0], SPOT[st][1], 'sit', performance.now()); } },
     pulse(st) { if (R && st === 'machine') R.leverT = performance.now(); },
     isPetting() { return !!(R && R.petting); },
-    overPet(x, y) { if (!R || !R.petting || !R.pickAt) return false; const h = R.pickAt(x, y); return !!(h && h.pet === R.petting.i); },
+    overPet(x, y) { if (!R || !R.petting || !R.pickNear) return false; const h = R.pickNear(x, y, Math.max(30, Math.min(innerWidth, innerHeight) * 0.06), 6); return !!(h && h.pet === R.petting.i); },
     trick() { if (R) trick(); },
     stand(on) { if (R) stand(on); },
     playDead() { if (R) playDead(); },
+    petPlace(i, x, z) { const P = R && R.pets[i]; if (P) { P.x = x; P.z = z; P.tx = x; P.tz = z; P.state = 'idle'; P.until = performance.now() + 4000; } },
+    petsInfo() { return R && R.pets ? R.pets.map(P => ({k: P.cfg.kind, x: +P.x.toFixed(2), z: +P.z.toFixed(2), s: P.state, t: P.inter ? P.inter.type : ''})) : []; },
     petScreen(i) { if (!R || !R.pets[i]) return null; const P = R.pets[i]; const v = new THREE.Vector3(P.x, 0.3, P.z).project(R.camera); const r = R.renderer.domElement.getBoundingClientRect(); return {x: r.left + (v.x + 1) / 2 * r.width, y: r.top + (1 - v.y) / 2 * r.height}; },
     rubInput(x, isHand) { if (R) rubInput(x, isHand); },
     stopPetting() { if (R && R.petting) endPetting(); },
@@ -1936,7 +2027,7 @@ if (window.STUDIO_HOSTED) $('#importLbl').hidden = false;
   let peek = null;
   document.addEventListener('pointermove', e => { const a = e.target && e.target.closest ? e.target.closest('.room-bottom .stations a') : null; if (a === peek) return; if (peek) peek.classList.remove('peek'); peek = a; if (a) a.classList.add('peek'); });
 })();
-window.StudioHooks = {look: (dx, dy) => Room.look(dx, dy), zoom: f => Room.zoom(f), isPetting: () => Room.isPetting(), rubInput: (x, h) => Room.rubInput(x, h), stopPetting: () => Room.stopPetting(), stand: on => Room.stand(on), playDead: () => Room.playDead(), overPet: (x, y) => Room.overPet(x, y), trick: () => Room.trick(), petScreen: i => Room.petScreen(i || 0), notice, stations: STATIONS};
+window.StudioHooks = {petsInfo: () => Room.petsInfo(), _petPlace: (i, x, z) => Room.petPlace(i, x, z), look: (dx, dy) => Room.look(dx, dy), zoom: f => Room.zoom(f), isPetting: () => Room.isPetting(), rubInput: (x, h) => Room.rubInput(x, h), stopPetting: () => Room.stopPetting(), stand: on => Room.stand(on), playDead: () => Room.playDead(), overPet: (x, y) => Room.overPet(x, y), trick: () => Room.trick(), petScreen: i => Room.petScreen(i || 0), notice, stations: STATIONS};
 /* ---------- boot ---------- */
 async function migrate() {
   const local = S.localItems.filter(x => !store.items.find(y => y.id === x.id));
