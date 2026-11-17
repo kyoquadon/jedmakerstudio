@@ -1571,7 +1571,7 @@ const Room = (() => {
       for (let k = 0; k < 9; k++) setTimeout(() => spawnFx('heart', P.x + (Math.random() - 0.5) * 0.5, 0.5 + Math.random() * 0.3, P.z + (Math.random() - 0.5) * 0.5), k * 90);
       $('#roomCaption').textContent = `${P.cfg.name} ${pick(PET_LINES[P.cfg.kind])}`;
       const pc = CFG.pets.find(p => p.kind === P.cfg.kind); if (pc) { pc.petted = (pc.petted || 0) + 1; P.cfg.petted = pc.petted; scheduleSave(); }
-      setTimeout(() => { if (R.petting === Pt) endPetting(); }, 2400);
+      setTimeout(() => { if (R.petting === Pt) { Pt.done = false; Pt.rubs = 0; } }, 1800);
     }
   }
   const TRICKS = {cat: 'does a spinning leap!', dog: 'jumps and spins for you!', otter: 'does a barrel roll!', bunny: 'pulls off a huge binky!', robot: 'does a 360 hover spin!'};
@@ -1580,7 +1580,7 @@ const Room = (() => {
     list.forEach((P, k) => { if (!P || (P.trickT0 && now - P.trickT0 < 1200)) return; P.trickT0 = now + k * 150; for (let j = 0; j < 5; j++) setTimeout(() => spawnFx('heart', P.x + (Math.random() - 0.5) * 0.4, 0.8, P.z + (Math.random() - 0.5) * 0.4), 300 + j * 80); });
     if (CFG.sound && list[0]) { petSound(list[0].cfg.kind); tone('sine', 400, 1200, 0.35, 0.06, 0.1); }
     if (list[0]) $('#roomCaption').textContent = `${list[0].cfg.name} ${TRICKS[list[0].cfg.kind]}`;
-    if (R.petting && !R.petting.done) { rubbed(); rubbed(); }
+
   }
   function rubInput(x, isHand) {
     const Pt = R.petting; if (!Pt || Pt.done) return;

@@ -227,6 +227,13 @@ footer a{color:var(--blue)}
 .hand-cursor{position:fixed;left:0;top:0;width:30px;height:30px;margin:-15px 0 0 -15px;border:3px solid #fff;border-radius:50%;box-shadow:0 0 0 2px #1d2030,0 0 12px rgba(47,91,234,.8);pointer-events:none;z-index:50;transition:background .1s,transform .1s}
 .hand-cursor.pinch{background:rgba(255,200,58,.85);transform:scale(.7)}
 .hand-cursor.lost{opacity:.3}
+.cal-wrap{position:fixed;inset:0;z-index:120;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(22,19,26,.72)}
+.cal-wrap[hidden]{display:none}
+.cal-box{width:min(520px,100%);max-height:calc(100% - 16px);overflow-y:auto}
+#calCam{width:100%;max-width:480px;aspect-ratio:4/3;align-self:center;border:2px solid var(--ink);border-radius:12px;background:#1d2030;transform:scaleX(-1)}
+.cal-meter{height:12px;border:2px solid var(--ink);border-radius:999px;background:#fff;overflow:hidden}
+.cal-meter span{display:block;height:100%;width:0;background:var(--green);transition:width .15s}
+
 .hand-cursor.grab{background:rgba(47,91,234,.55);border-radius:10px}
 .hand-cursor.petting-hand{width:150px;height:150px;margin:-75px 0 0 -75px;border:0;border-radius:0;box-shadow:none;background:url(assets/icons/raised_hand.webp) center/contain no-repeat;opacity:.55;filter:drop-shadow(0 6px 10px rgba(0,0,0,.35))}
 .hand-cursor.petting-hand.rubbing{opacity:.75}

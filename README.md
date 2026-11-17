@@ -48,7 +48,9 @@ Cloudflare's dashboard menus get renamed now and then, so a label below might be
 | Hold a thumbs up | Saves what you're working on |
 | While petting: rub the big hand over the pet | Makes the pet happy |
 | While petting: clap | The pet jumps and does a trick |
-| While petting: lower your hand for 3 seconds | Zooms back out |
+| While petting: lower your hands for 3 seconds | Zooms back out |
+
+If pinches or claps feel off, press **Calibrate hands** (hover the status pill at the top right). It walks you through six short checks and tunes reach, pinch, three-finger pinch and clap to your camera. The settings are saved in that browser.
 
 For the best tracking, face a light source, keep your hand 40 to 70 cm from the laptop, and keep the background plain.
 
