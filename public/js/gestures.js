@@ -35,19 +35,24 @@
   // petting view: hands keep their real spacing (gain 1: the camera frame maps once across the screen)
   const petCenter = () => ({cx: C.x0 + C.xw / 2, cy: C.y0 + C.yh / 2});
   const petPalm = lm => { const {cx, cy} = petCenter(); return {x: innerWidth / 2 + ((1 - lm[9].x) - cx) * innerWidth, y: innerHeight / 2 + (lm[9].y - cy) * innerHeight}; };
+  function handPts(lm) {
+    const W = innerWidth, Hh = innerHeight, palm = petPalm(lm); const px = p => ({x: (1 - p.x) * 640, y: p.y * 480});
+    const p0 = px(lm[0]), p9 = px(lm[9]); const plen = Math.min(W, Hh) * 0.17; const s = plen / (Math.hypot(p9.x - p0.x, p9.y - p0.y) || 1);
+    return lm.map(q0 => { const q = px(q0); return {x: palm.x + (q.x - p9.x) * s, y: palm.y + (q.y - p9.y) * s}; });
+  }
+  let dial = false, dialOverT = 0;
   function drawHands(list) {
     const W = innerWidth, Hh = innerHeight;
     if (ov.width !== W || ov.height !== Hh) { ov.width = W; ov.height = Hh; }
     const b = ov.getContext('2d'); b.clearRect(0, 0, W, Hh);
     if (!list.length) { ovDirty = false; return; }
     b.lineCap = b.lineJoin = 'round';
-    list.forEach(({lm, over}) => {
-      const palm = petPalm(lm); const px = p => ({x: (1 - p.x) * 640, y: p.y * 480});
-      const p0 = px(lm[0]), p9 = px(lm[9]); const plen = Math.min(W, Hh) * 0.17; const s = plen / (Math.hypot(p9.x - p0.x, p9.y - p0.y) || 1);
-      const pts = lm.map(q0 => { const q = px(q0); return {x: palm.x + (q.x - p9.x) * s, y: palm.y + (q.y - p9.y) * s}; }); const fw = plen * 0.3;
+    list.forEach(({lm, over, tip}) => {
+      const pts = handPts(lm), plen = Math.min(W, Hh) * 0.17, fw = plen * 0.3;
       const path = () => { b.beginPath(); CHAINS.forEach(ch => ch.forEach((i, k) => k ? b.lineTo(pts[i].x, pts[i].y) : b.moveTo(pts[i].x, pts[i].y))); b.stroke(); b.beginPath(); [0, 1, 5, 9, 13, 17].forEach((i, k) => k ? b.lineTo(pts[i].x, pts[i].y) : b.moveTo(pts[i].x, pts[i].y)); b.closePath(); b.fill(); b.stroke(); };
       b.strokeStyle = b.fillStyle = '#1d2030'; b.lineWidth = fw + 6; path();
       b.strokeStyle = b.fillStyle = over ? '#ffb59c' : '#fff4ea'; b.lineWidth = fw; path();
+      if (tip) { const t = pts[8]; b.lineWidth = 5; b.strokeStyle = over ? '#ff5b4f' : '#1d2030'; b.beginPath(); b.arc(t.x, t.y - fw * 0.15, fw * 0.32, 0, 6.3); b.stroke(); }
     });
     ovDirty = true;
   }
@@ -55,7 +60,12 @@
   function frame(now) {
     const dt = Math.min(0.1, lastF ? (now - lastF) / 1000 : 0.016); lastF = now;
     const a = 1 - Math.exp(-16 * dt), ah = 1 - Math.exp(-20 * dt);
-    if (!cursor.hidden) {
+    if (dial && handsS.length) {
+      const t = handPts(handsS[0].lm)[8]; const fw = Math.min(innerWidth, innerHeight) * 0.17 * 0.3; cur.x = t.x; cur.y = t.y - fw * 0.15; hoverDue = true;
+      if (!P.pinched) { hist.push({x: cur.x, y: cur.y, t: now}); while (hist.length && now - hist[0].t > 400) hist.shift(); }
+      if (now - lastHover > 33 && !P.pinched) { hoverDue = false; lastHover = now; pe('pointermove', at(cur), cur); }
+      if (now - dialOverT > 120 && H.thermoOver) { dialOverT = now; const o = H.thermoOver(cur.x, cur.y) || !!(at(cur) && at(cur).closest && at(cur).closest('.thermo-bar button')); if (handsT[0]) handsT[0].over = o; P.dialOver = o; }
+    } else if (!cursor.hidden) {
       const dx = tgt.x - cur.x, dy = tgt.y - cur.y;
       if (Math.abs(dx) + Math.abs(dy) > 0.2) { cur.x += dx * a; cur.y += dy * a; place(cursor, cur); hoverDue = true; }
       if (!P.pinched) { hist.push({x: cur.x, y: cur.y, t: now}); while (hist.length && now - hist[0].t > 400) hist.shift(); }
@@ -163,8 +173,9 @@
     const clapGrace = now - lastClap < 2500; // just after a clap, nothing can end petting
     // petting: lowering every hand for 3 seconds steps back out
     if (petting) { if (!pointer) { if (!P.petAway) P.petAway = now; else if (now - P.petAway > 3000 && !clapGrace) { P.petAway = 0; H.stopPetting && H.stopPetting(); } } else P.petAway = 0; } else P.petAway = 0;
-    cursor2.hidden = true; if (!petting && (ovDirty || handsT.length)) { handsT = []; drawHands([]); ovClear = true; ov.hidden = true; } if (!petting && running && !CAL.active) cursor.hidden = false;
-    if (!pointer && petting) handsT = [];
+    dial = !petting && !!(H.isThermo && H.isThermo());
+    cursor2.hidden = true; if (!petting && !dial && (ovDirty || handsT.length)) { handsT = []; drawHands([]); ovClear = true; ov.hidden = true; } if (!petting && !dial && running && !CAL.active) cursor.hidden = false;
+    if (!pointer && (petting || dial)) handsT = [];
     if (!pointer) { cursor.classList.add('lost'); cursor.classList.remove('grab'); P.grab = null; P.pinched = false; P.onCount = 0; P.palm = null; P.fistSince = P.thumbSince = 0; two = null; return; }
     cursor.classList.remove('lost');
     const lm = pointer.lm, g = pointer.g;
@@ -181,8 +192,9 @@
       if ([g, other && other.g].includes('Closed_Fist') && handsApart && !clapGrace) { if (!P.fistSince) P.fistSince = now; else if (now - P.fistSince > 1500 && H.stopPetting) { P.fistSince = 0; H.stopPetting(); } } else P.fistSince = 0;
       P.palm = null; P.pinched = false; return;
     }
+    if (dial) { cursor.hidden = true; cursor2.hidden = true; ov.hidden = false; handsT = [{lm, over: !!P.dialOver, tip: true}].concat(other ? [{lm: other.lm, over: false}] : []); }
     // two-hand pinch: zoom and turn
-    if (other && pinchRatio(lm) < C.pinchOn && pinchRatio(other.lm) < C.pinchOn) {
+    if (!dial && other && pinchRatio(lm) < C.pinchOn && pinchRatio(other.lm) < C.pinchOn) {
       const a = {x: (lm[4].x + lm[8].x) / 2, y: (lm[4].y + lm[8].y) / 2}, b = {x: (other.lm[4].x + other.lm[8].x) / 2, y: (other.lm[4].y + other.lm[8].y) / 2};
       const d = dist(a, b), ang = Math.atan2(b.y - a.y, b.x - a.x);
       if (two) { if (H.zoom) H.zoom(two.d / d); let da = ang - two.a; da = Math.atan2(Math.sin(da), Math.cos(da)); if (H.look) H.look(-da * 500, 0); }
@@ -191,7 +203,7 @@
     if (two) { two = null; P.pinched = true; } // keep pinch latched until the fingers open, so ending a zoom never clicks
     // cursor follows the index fingertip, smoothed
     const pr = pinchRatio(lm);
-    if (!P.pinched) { tgt.x = mapX(lm[8].x); tgt.y = mapY(lm[8].y); }
+    if (!P.pinched && !dial) { tgt.x = mapX(lm[8].x); tgt.y = mapY(lm[8].y); }
     // three-finger pinch = grab the open page and drag it up or down (no click)
     if (triPinch(lm)) {
       const gy = (lm[4].y + lm[8].y + lm[12].y) / 3 * innerHeight;
@@ -208,9 +220,9 @@
     const gunning = [pointer, other].some(h => h && gunShape(h.lm).aim);
     const has = name => [g, other && other.g].includes(name);
     if (has('Closed_Fist') && !P.pinched) { if (!P.fistSince) P.fistSince = now; if (!P.fistDone && now - P.fistSince > 600) { P.fistDone = true; if (location.hash && location.hash !== '#room') { location.hash = 'room'; H.notice && H.notice('Back in the room.'); } } } else { P.fistSince = 0; P.fistDone = false; }
-    if (has('Thumb_Up') && !gunning) { if (!P.thumbSince) P.thumbSince = now; if (!P.thumbDone && now - P.thumbSince > 700) { P.thumbDone = true; const st = location.hash.slice(1); const b = SAVE[st] && document.querySelector(SAVE[st]); if (b && b.offsetParent !== null && !b.disabled) b.click(); else H.notice && H.notice('Nothing to save here yet.'); } } else { P.thumbSince = 0; P.thumbDone = false; }
+    if (has('Thumb_Up') && !gunning && !dial) { if (!P.thumbSince) P.thumbSince = now; if (!P.thumbDone && now - P.thumbSince > 700) { P.thumbDone = true; const st = location.hash.slice(1); const b = SAVE[st] && document.querySelector(SAVE[st]); if (b && b.offsetParent !== null && !b.disabled) b.click(); else H.notice && H.notice('Nothing to save here yet.'); } } else { P.thumbSince = 0; P.thumbDone = false; }
     const palmHand = other && other.g === 'Open_Palm' ? other : (g === 'Open_Palm' && !P.pinched ? pointer : null);
-    if (palmHand) { const px = (1 - palmHand.lm[0].x) * innerWidth, py = palmHand.lm[0].y * innerHeight; if (P.palm && H.look) H.look((px - P.palm.x) * 1.4, (py - P.palm.y) * 0.6); P.palm = {x: px, y: py}; } else P.palm = null;
+    if (palmHand && !dial) { const px = (1 - palmHand.lm[0].x) * innerWidth, py = palmHand.lm[0].y * innerHeight; if (P.palm && H.look) H.look((px - P.palm.x) * 1.4, (py - P.palm.y) * 0.6); P.palm = {x: px, y: py}; } else P.palm = null;
   }
 
   /* ---------- calibration ---------- */

@@ -1070,7 +1070,7 @@ const Room = (() => {
     gallery: {pos: [-0.5, 2.0, 0.6], tgt: [-5, 1.6, 0.3]},
     corner: {pos: [2.0, 2.8, 5.6], tgt: [2.0, 0.6, 1.8]},
     playground: {pos: [-0.6, 2.6, 5.8], tgt: [-2.6, 0.5, 2.4]},
-    thermostat: {pos: [-4.4, 2.37, -2.96], tgt: [-4.4, 2.37, -3.96]}
+    thermostat: {pos: [-4.4, 2.5, -3.2], tgt: [-4.4, 2.5, -3.96]}
   };
   const SPOT = {workbench: [-2.6, -1.6], pinboard: [0, -2.5], machine: [1.9, -2.2], mirror: [3.1, -1.8], wall: [3.7, -0.4], gallery: [-3.8, -0.2], corner: [0.6, 2.4], playground: [-1.2, 1.4], thermostat: [-3.9, -1.6]};
   const WINS = [
@@ -1213,14 +1213,8 @@ const Room = (() => {
     const cv = R.thermoCv || (R.thermoCv = Object.assign(document.createElement('canvas'), {width: 512, height: 512}));
     R.thermoTex = new THREE.CanvasTexture(cv); R.thermoTex.anisotropy = 4;
     R.thermo = new THREE.Mesh(new THREE.CircleGeometry(0.18, 48), new THREE.MeshBasicMaterial({color: 0xffffff, map: R.thermoTex})); R.thermo.position.set(cx, cy, -3.925); R.thermo.userData.tpart = 'screen'; g.add(R.thermo);
-    // a small plate of physical buttons under the dial
-    const plate = box(0.4, 0.13, 0.03, '#fffdf7', cx, cy - 0.31, z0 + 0.005, g); plate.userData.tpart = 'plate';
-    const lab = new THREE.Mesh(new THREE.PlaneGeometry(0.4, 0.13), new THREE.MeshBasicMaterial({transparent: true, map: ctex(512, 166, (x, w, h) => {
-      x.fillStyle = '#1d2030'; x.font = '800 24px Figtree, sans-serif'; x.textAlign = 'center'; [['BACK', 0.2], ['SURPRISE', 0.5], ['LIST', 0.8]].forEach(([t, f]) => x.fillText(t, w * f, h - 18)); })}));
-    lab.position.set(cx, cy - 0.31, z0 + 0.021); g.add(lab);
-    R.thermoBtns = {};
-    [['back', -0.12, '#2f5bea'], ['dice', 0, '#ffc83a'], ['list', 0.12, '#1fae7a']].forEach(([id, dx, col]) => {
-      const b = cyl(0.034, 0.038, 0.03, col, cx + dx, cy - 0.29, z0 + 0.03, g, 20); b.rotation.x = Math.PI / 2; b.userData.tpart = 'btn'; b.userData.tbtn = id; b.userData.z0 = b.position.z; R.thermoBtns[id] = b; });
+    // an invisible, wider grip so the ring is easy to catch with a finger or a pinch
+    const grip = new THREE.Mesh(new THREE.TorusGeometry(0.205, 0.04, 6, 32), new THREE.MeshBasicMaterial({transparent: true, opacity: 0, depthWrite: false})); grip.userData.tpart = 'ring'; R.thermoRing.add(grip);
     drawThermo();
   }
   function drawThermo() {
@@ -1245,7 +1239,6 @@ const Room = (() => {
     const hit = ray.intersectObject(g, true).find(h => h.object.userData.tpart); if (!hit) return null; const o = hit.object, tp = o.userData.tpart;
     if (tp === 'screen' && hit.uv) return {part: 'screen', x: hit.uv.x * 512, y: (1 - hit.uv.y) * 512};
     if (tp === 'ring') { const lx = hit.point.x - R.thermoRing.position.x; return {part: 'ring', side: lx < 0 ? -1 : 1}; }
-    if (tp === 'btn') return {part: 'btn', id: o.userData.tbtn};
     return {part: 'plate'};
   }
   function thermoPick(cx, cy, generous) {
@@ -1255,7 +1248,6 @@ const Room = (() => {
     return h0;
   }
   function thermoTurn(dir) { if (!R || !R.thermoRing) return; R.thermoTurn = (R.thermoTurn || 0) - dir * Math.PI / 12; R.thermoSpin = {from: R.thermoRing.rotation.z, to: R.thermoTurn, t0: performance.now()}; if (CFG.sound) tick(); }
-  function thermoPress(id) { const b = R && R.thermoBtns && R.thermoBtns[id]; if (!b) return; b.position.z = b.userData.z0 - 0.014; setTimeout(() => { if (b.parent) b.position.z = b.userData.z0; }, 160); if (CFG.sound) tick(); }
   function tick() { try { const ac = R.ac || (R.ac = new (window.AudioContext || window.webkitAudioContext)()); const o = ac.createOscillator(), gn = ac.createGain(); o.type = 'square'; o.frequency.value = 1800; gn.gain.setValueAtTime(0.03, ac.currentTime); gn.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + 0.04); o.connect(gn); gn.connect(ac.destination); o.start(); o.stop(ac.currentTime + 0.05); } catch (e) {} }
   function buildWorkbench() {
     const g = group('workbench'); const t = CFG.parts.desk.type;
@@ -1794,7 +1786,7 @@ const Room = (() => {
       if (devOn() && !down) { const t = performance.now(); if (t - (R.hoverT || 0) < 40) return; R.hoverT = t; const h = thermoPick(e.clientX, e.clientY, e.pointerId === HAND_ID); el.style.cursor = h && h.part !== 'plate' ? 'pointer' : 'grab'; window.ThermoUI && ThermoUI.hover(h, e.pointerId === HAND_ID); if (h) return; }
       if (R.petting) { const h = pickAt(e.clientX, e.clientY); if (h && h.pet === R.petting.i) rubInput(e.clientX, false); return; } if (down) { const ym = R.camera.aspect < 0.8 ? 0.75 : 0.45; R.yaw = Math.max(-ym, Math.min(ym, R.yaw - (e.clientX - down.x) * 0.003)); R.pitch = Math.max(-0.2, Math.min(0.25, R.pitch + (e.clientY - down.y) * 0.002)); down.x = e.clientX; down.y = e.clientY; return; } if (e.pointerType === 'mouse') { const t = performance.now(); if (t - (R.hoverT || 0) < 50) return; R.hoverT = t; setHover(pickFor(e, 6)); } });
     el.addEventListener('pointerup', e => {
-      if (devDown) { const dd = devDown, k = knob; devDown = null; knob = null; if (Math.hypot(e.clientX - dd.sx, e.clientY - dd.sy) < 8 && !(k && k.turned)) { const h = dd.h; if (h.part === 'ring') { thermoTurn(h.side); window.ThermoUI && ThermoUI.turn(h.side); } else if (h.part === 'btn') { thermoPress(h.id); window.ThermoUI && ThermoUI.button(h.id); } else if (h.part === 'screen') { window.ThermoUI && ThermoUI.tap(h.x, h.y, e.pointerId === HAND_ID); } } return; }
+      if (devDown) { const dd = devDown, k = knob; devDown = null; knob = null; if (Math.hypot(e.clientX - dd.sx, e.clientY - dd.sy) < 8 && !(k && k.turned)) { const h = dd.h; if (h.part === 'ring') { thermoTurn(h.side); window.ThermoUI && ThermoUI.turn(h.side); } else if (h.part === 'screen') { window.ThermoUI && ThermoUI.tap(h.x, h.y, e.pointerId === HAND_ID); } } return; }
       const moved = down ? Math.hypot(e.clientX - down.sx, e.clientY - down.sy) : 99; down = null; if (moved < 6) { const h = pickFor(e); if (R.petting && !(h && h.pet === R.petting.i)) { endPetting(!(h && h.st)); if (!h || !h.st) return; } if (h && h.pet !== undefined) petIt(h.pet); else if (h && h.st) { Room.pulse(h.st); goto(h.st); } } });
     el.addEventListener('pointerleave', () => setHover(null));
     new ResizeObserver(resize).observe(stage); resize();
@@ -1832,8 +1824,8 @@ const Room = (() => {
     else $('#roomCaption').textContent = st ? `${SNAME[st]}: ${SDESC[st]} Click to use it.` : defaultCaption();
   }
   const defaultCaption = () => { const pets = R && R.pets && R.pets.length ? ` ${R.pets.map(p => p.cfg.name).join(', ').replace(/, ([^,]*)$/, ' and $1')} ${R.pets.length > 1 ? 'are' : 'is'} wandering about.` : ''; return `Drag to look around. Tap anything in the room to use it.${pets}`; };
-  function resize() { const st = $('#roomStage'); const w = st.clientWidth, h = st.clientHeight; if (!w || !h) return; R.renderer.setSize(w, h, false); R.camera.aspect = w / h; R.camera.fov = w / h < 0.8 ? 66 : w / h < 1.2 ? 56 : 46; R.camera.updateProjectionMatrix(); }
-  function viewFor(st) { const v = V[st || 'room']; const p = new THREE.Vector3(...v.pos), t = new THREE.Vector3(...v.tgt); if (!st && R.camera.aspect < 0.8) { p.set(0, 4.0, 7.4); t.set(0, 1.0, -1.2); } if (st === 'thermostat' && R.camera.aspect < 0.8) { p.set(-4.4, 2.36, -3.24); t.set(-4.4, 2.36, -3.96); } return {pos: p, tgt: t}; }
+  function resize() { const st = $('#roomStage'); const w = st.clientWidth, h = st.clientHeight; if (!w || !h) return; R.renderer.setSize(w, h, false); R.camera.aspect = w / h; R.camera.fov = w / h < 0.8 ? 66 : w / h < 1.2 ? 56 : 46; if (R.focusSt === 'thermostat') setTimeout(() => { if (R.focusSt !== 'thermostat') return; const v = viewFor('thermostat'); if (R.tw) R.tw.to = v; else { R.cur.pos.copy(v.pos); R.cur.tgt.copy(v.tgt); } }); R.camera.updateProjectionMatrix(); }
+  function viewFor(st) { const v = V[st || 'room']; const p = new THREE.Vector3(...v.pos), t = new THREE.Vector3(...v.tgt); if (!st && R.camera.aspect < 0.8) { p.set(0, 4.0, 7.4); t.set(0, 1.0, -1.2); } if (st === 'thermostat') { const th = Math.tan(R.camera.fov * Math.PI / 360), fitH = th * 0.72, fitW = th * R.camera.aspect * 0.94; const d = 0.232 / Math.min(fitH, fitW); const lift = th * d * (R.camera.aspect < 0.8 ? 0.06 : 0.12); p.set(-4.4, 2.5 - lift, -3.93 + d); t.set(-4.4, 2.5 - lift, -3.96); } return {pos: p, tgt: t}; }
   let rT = 0;
   return {
     init() { if (!window.THREE) return false; const ok = build(); if (!ok) return false; (document.fonts ? document.fonts.ready : Promise.resolve()).then(() => { refreshDyn(); drawThermo(); }); return true; },
@@ -1850,9 +1842,11 @@ const Room = (() => {
     trick() { if (R) trick(); },
     stand(on) { if (R) stand(on); },
     playDead() { if (R) playDead(); },
+    isThermo() { return !!(R && R.thermoOn && R.focusSt === 'thermostat' && !R.petting); },
+    thermoOver(x, y) { if (!R || !R.thermoOn) return false; const h = thermoPick(x, y, true); if (!h || h.part === 'plate') return false; return h.part === 'ring' || !!(window.ThermoUI && ThermoUI.zoneAt(h.x, h.y, true)); },
     thermoMode(on) { if (!R) return; on = !!on; if (R.thermoOn === on) return; R.thermoOn = on; if (on) setHover(null); drawThermo(); },
     thermoRedraw() { drawThermo(); },
-    thermoScreen(px, py, part) { if (!R || !R.thermo) return null; const v = part === 'ring' ? new THREE.Vector3(-4.4 + px * 0.2, 2.5, -3.9) : part ? R.thermoBtns[part].position.clone() : new THREE.Vector3(-4.4 + (px / 512 * 2 - 1) * 0.18, 2.5 - (py / 512 * 2 - 1) * 0.18, -3.925); v.project(R.camera); const r = R.renderer.domElement.getBoundingClientRect(); return {x: r.left + (v.x + 1) / 2 * r.width, y: r.top + (1 - v.y) / 2 * r.height}; },
+    thermoScreen(px, py, part) { if (!R || !R.thermo) return null; const v = part === 'ring' ? new THREE.Vector3(-4.4 + px * 0.2, 2.5, -3.9) : new THREE.Vector3(-4.4 + (px / 512 * 2 - 1) * 0.18, 2.5 - (py / 512 * 2 - 1) * 0.18, -3.925); v.project(R.camera); const r = R.renderer.domElement.getBoundingClientRect(); return {x: r.left + (v.x + 1) / 2 * r.width, y: r.top + (1 - v.y) / 2 * r.height}; },
     petPlace(i, x, z) { const P = R && R.pets[i]; if (P) { P.x = x; P.z = z; P.tx = x; P.tz = z; P.state = 'idle'; P.until = performance.now() + 4000; } },
     petsInfo() { return R && R.pets ? R.pets.map(P => ({k: P.cfg.kind, x: +P.x.toFixed(2), z: +P.z.toFixed(2), s: P.state, t: P.inter ? P.inter.type : ''})) : []; },
     petScreen(i) { if (!R || !R.pets[i]) return null; const P = R.pets[i]; const v = new THREE.Vector3(P.x, 0.3, P.z).project(R.camera); const r = R.renderer.domElement.getBoundingClientRect(); return {x: r.left + (v.x + 1) / 2 * r.width, y: r.top + (1 - v.y) / 2 * r.height}; },
@@ -1901,7 +1895,7 @@ function route() {
   const h = location.hash.slice(1); const st = STATIONS.includes(h) ? h : null; S.station = st || 'room';
   if (st !== 'thermostat') S.thermoList = false; const device = st === 'thermostat' && !S.thermoList; const pst = device ? null : st;
   const panel = $('#panel'); const wasHidden = panel.hidden; panel.hidden = !pst; document.body.classList.toggle('panel-open', !!pst); document.body.classList.toggle('panel-thermo', pst === 'thermostat'); document.body.classList.toggle('thermo-device', device);
-  $('#thermoListBtn').hidden = !device; Room.thermoMode(device); if (!device && window.ThermoUI) ThermoUI.stopEdit();
+  $('#thermoBar').hidden = !device; Room.thermoMode(device); if (!device && window.ThermoUI) ThermoUI.stopEdit();
   $$('.station').forEach(s => { s.hidden = s.dataset.name !== pst; });
   $$('.stations a').forEach(a => a.setAttribute('aria-current', a.dataset.st === st ? 'page' : 'false'));
   if (device) $('#roomCaption').textContent = 'Thermostat: tap a row on the screen, turn the ring or tap its sides to change it. Blue button goes back.';
@@ -2024,7 +2018,7 @@ const ThermoUI = window.ThermoUI = (() => {
   const lab = (list, cur) => (list.find(v => v[0] === cur) || [cur, cur])[1];
   const near = (hex) => { const c = new THREE.Color(hex); let bi = 0, bd = 9; SW.forEach((s, i) => { const d = new THREE.Color(s); const dd = Math.abs(d.r - c.r) + Math.abs(d.g - c.g) + Math.abs(d.b - c.b); if (dd < bd) { bd = dd; bi = i; } }); return bi; };
   const set = (fn, kind, key) => { Room.set(fn, kind, key); redraw(); };
-  const say = t => { const c = $('#roomCaption'); if (c) c.textContent = t; };
+  const say = t => notice(t);
   function pages() {
     const C = Room.cfg(); const pk = Object.keys(PRESETS); const P = C.pets[U.pet] || C.pets[0]; const part = PART_KEYS[U.part]; const pc = C.parts[part];
     return [
@@ -2045,7 +2039,9 @@ const ThermoUI = window.ThermoUI = (() => {
       {title: 'Pets', rows: [
         {label: 'Pet', value: PET_KINDS[P.kind].label, icon: P.kind, step: d => { U.pet = (U.pet + d + C.pets.length) % C.pets.length; redraw(); }},
         {label: 'In the room', value: P.on ? 'Yes' : 'No', toggle: P.on, step: () => { if (!P.on && C.pets.filter(p => p.on).length >= 3) { notice('Three pets is the limit, or they start a union. Send one out first.'); return; } set(c => { c.pets[U.pet].on = !c.pets[U.pet].on; }, 'pets'); }},
-        {label: 'Name', value: U.editing ? P.name + (Math.floor(performance.now() / 450) % 2 ? '|' : ' ') : P.name, name: true, step: d => { if (d > 0) set(c => { let n; do { n = NAMES[Math.floor(Math.random() * NAMES.length)]; } while (n === c.pets[U.pet].name); c.pets[U.pet].name = n; }, 'quiet'); else editName(); }},
+        {label: 'Name', value: U.editing ? P.name + (Math.floor(performance.now() / 450) % 2 ? '|' : ' ') : P.name, name: true, step: d => { if (d > 0) set(c => { let n; do { n = NAMES[Math.floor(Math.random() * NAMES.length)]; } while (n === c.pets[U.pet].name); c.pets[U.pet].name = n; }, 'quiet'); else editName(); }}]},
+      {title: 'Pet looks', rows: [
+        {label: 'Pet', value: PET_KINDS[P.kind].label, icon: P.kind, step: d => { U.pet = (U.pet + d + C.pets.length) % C.pets.length; redraw(); }},
         {label: 'Colour', value: '', swatch: P.color, strip: true, step: d => set(c => { c.pets[U.pet].color = SW[(near(c.pets[U.pet].color) + d + SW.length) % SW.length]; }, 'petcolor')}]},
       {title: 'Room parts', rows: [
         {label: 'Part', value: PART_LABEL[part], step: d => { U.part = (U.part + d + PART_KEYS.length) % PART_KEYS.length; redraw(); }},
@@ -2056,11 +2052,18 @@ const ThermoUI = window.ThermoUI = (() => {
     ];
   }
   // layout on the 512 px round screen
-  const RX = 86, RW = 340, RH = 58, RG = 8, RY0 = 158;
+  const RX = 76, RW = 360, RH = 78, RG = 10, RY0 = 160;
   const rowBox = i => ({x: RX, y: RY0 + i * (RH + RG), w: RW, h: RH});
-  const zones = () => { const P = pages()[U.page]; const z = [{id: 'prev', x: 70, y: 62, w: 92, h: 64}, {id: 'next', x: 350, y: 62, w: 92, h: 64}]; P.rows.forEach((r, i) => z.push(Object.assign({id: 'row', i}, rowBox(i)))); return z; };
+  const zones = () => { const P = pages()[U.page]; const z = [{id: 'prev', x: 50, y: 44, w: 120, h: 100}, {id: 'next', x: 342, y: 44, w: 120, h: 100}]; P.rows.forEach((r, i) => z.push(Object.assign({id: 'row', i}, rowBox(i)))); return z; };
   const ICONS = {}; const icon = k => { if (!ICONS[k]) { const im = new Image(); im.onload = redraw; im.src = PET_KINDS[k].icon; ICONS[k] = im; } return ICONS[k]; };
   function fit(x, t, max, size, weight) { let s = size; do { x.font = `${weight} ${s}px Figtree, sans-serif`; s -= 2; } while (x.measureText(t).width > max && s > 12); }
+  function icn(x, k, cx, cy, col) {
+    x.save(); x.translate(cx, cy); x.strokeStyle = x.fillStyle = col; x.lineWidth = 3; x.lineCap = x.lineJoin = 'round';
+    if (k === 'pencil') { x.rotate(-Math.PI / 4); x.strokeRect(-11, -4, 18, 8); x.beginPath(); x.moveTo(7, -4); x.lineTo(13, 0); x.lineTo(7, 4); x.closePath(); x.fill(); }
+    else { rr(x, -11, -11, 22, 22, 5); x.stroke(); [[-5, -5], [5, 5], [0, 0], [5, -5], [-5, 5]].forEach(([a, b]) => { x.beginPath(); x.arc(a, b, 2.2, 0, 6.3); x.fill(); }); }
+    x.restore();
+  }
+  function chev(x, cx, cy, dir, s, col) { x.strokeStyle = col; x.lineWidth = Math.max(4, s * 0.45); x.lineCap = x.lineJoin = 'round'; x.beginPath(); x.moveTo(cx - dir * s * 0.35, cy - s); x.lineTo(cx + dir * s * 0.55, cy); x.lineTo(cx - dir * s * 0.35, cy + s); x.stroke(); }
   function rr(x, a, b, w, h, r) { x.beginPath(); x.moveTo(a + r, b); x.arcTo(a + w, b, a + w, b + h, r); x.arcTo(a + w, b + h, a, b + h, r); x.arcTo(a, b + h, a, b, r); x.arcTo(a, b, a + w, b, r); x.closePath(); }
   function paint(x, w, h) {
     const C = Room.cfg(); const all = pages(); U.page = Math.min(U.page, all.length - 1); const P = all[U.page]; U.sel = Math.min(U.sel, P.rows.length - 1);
@@ -2070,27 +2073,27 @@ const ThermoUI = window.ThermoUI = (() => {
     x.strokeStyle = C.mood === 'neon' ? '#ff3ea5' : '#ffc83a'; x.beginPath(); x.arc(256, 256, 236, Math.PI * 0.75, Math.PI * (0.75 + 1.5 * (C.brightness - 40) / 120)); x.stroke();
     // page header with arrows and dots
     const hv = U.hover; x.textAlign = 'center'; x.textBaseline = 'middle';
-    ['prev', 'next'].forEach(id => { const on = hv && hv.id === id; x.fillStyle = on ? '#ffc83a' : '#9fd8ff'; x.font = '800 54px Figtree, sans-serif'; x.fillText(id === 'prev' ? '‹' : '›', id === 'prev' ? 116 : 396, 92); });
-    x.fillStyle = '#fffdf7'; fit(x, P.title, 200, 36, 800); x.fillText(P.title, 256, 92);
-    all.forEach((_, i) => { x.fillStyle = i === U.page ? '#ffc83a' : 'rgba(255,255,255,.3)'; x.beginPath(); x.arc(256 + (i - (all.length - 1) / 2) * 18, 132, i === U.page ? 5.5 : 4, 0, 6.3); x.fill(); });
+    ['prev', 'next'].forEach(id => { const on = hv && hv.id === id, cx = id === 'prev' ? 118 : 394; x.fillStyle = on ? '#ffc83a' : 'rgba(255,255,255,.14)'; x.beginPath(); x.arc(cx, 96, 36, 0, 6.3); x.fill(); chev(x, cx, 96, id === 'prev' ? -1 : 1, 13, on ? '#1d2030' : '#fffdf7'); });
+    x.fillStyle = '#fffdf7'; fit(x, P.title, 190, 34, 800); x.fillText(P.title, 256, 92);
+    all.forEach((_, i) => { x.fillStyle = i === U.page ? '#ffc83a' : 'rgba(255,255,255,.3)'; x.beginPath(); x.arc(256 + (i - (all.length - 1) / 2) * 16, 132, i === U.page ? 5.5 : 4, 0, 6.3); x.fill(); });
     P.rows.forEach((r, i) => {
       const b = rowBox(i), sel = i === U.sel, hov = hv && hv.id === 'row' && hv.i === i;
       rr(x, b.x, b.y, b.w, b.h, 16); x.fillStyle = r.danger ? 'rgba(255,91,79,.28)' : hov ? 'rgba(255,255,255,.16)' : 'rgba(255,255,255,.07)'; x.fill();
       if (sel) { x.lineWidth = 4; x.strokeStyle = '#ffc83a'; x.stroke(); }
-      if (r.action) { x.fillStyle = r.danger ? '#ffb3ad' : '#fffdf7'; fit(x, r.label, b.w - 40, 26, 800); x.fillText(r.label, 256, b.y + b.h / 2 + 1); return; }
-      x.textAlign = 'left'; x.fillStyle = '#9fd8ff'; x.font = '700 16px Figtree, sans-serif'; x.fillText(r.label.toUpperCase(), b.x + 16, b.y + 15); x.textAlign = 'center';
-      if (!r.dim && !r.name) { x.fillStyle = sel ? '#ffc83a' : 'rgba(255,255,255,.55)'; x.font = '800 34px Figtree, sans-serif'; x.fillText('‹', b.x + 18, b.y + 37); x.fillText('›', b.x + b.w - 18, b.y + 37); }
-      if (r.name) { x.font = '20px sans-serif'; x.fillText('✏️', b.x + 24, b.y + 38); }
-      if (r.name) { x.font = '22px sans-serif'; x.fillText('🎲', b.x + b.w - 24, b.y + 38); }
-      const vy = b.y + 38; let vx = 256, room = b.w - 90;
-      if (r.icon) { const im = icon(r.icon); if (im.complete && im.naturalWidth) x.drawImage(im, b.x + 40, b.y + 18, 34, 34); }
-      if (r.strip) { const ci = near(r.swatch); for (let k = -3; k <= 3; k++) { const s = SW[(ci + k + SW.length) % SW.length]; x.fillStyle = s; x.beginPath(); x.arc(256 + k * 34, vy, k ? 11 : 16, 0, 6.3); x.fill(); x.lineWidth = k ? 2 : 4; x.strokeStyle = k ? '#1d2030' : '#fffdf7'; x.stroke(); } return; }
-      if (r.swatch) { x.fillStyle = r.swatch; x.beginPath(); x.arc(b.x + 62, vy, 11, 0, 6.3); x.fill(); x.lineWidth = 2; x.strokeStyle = '#fffdf7'; x.stroke(); vx += 14; room -= 40; }
-      if (r.bar !== undefined) { rr(x, b.x + 48, vy - 6, b.w - 160, 12, 6); x.fillStyle = 'rgba(255,255,255,.15)'; x.fill(); rr(x, b.x + 48, vy - 6, Math.max(12, (b.w - 160) * r.bar), 12, 6); x.fillStyle = '#ffc83a'; x.fill(); x.textAlign = 'right'; x.fillStyle = '#fffdf7'; x.font = '800 22px Figtree, sans-serif'; x.fillText(r.value, b.x + b.w - 40, vy + 1); x.textAlign = 'center'; return; }
-      if (r.toggle !== undefined) { rr(x, 256 - 34, vy - 14, 68, 28, 14); x.fillStyle = r.toggle ? '#1fae7a' : 'rgba(255,255,255,.2)'; x.fill(); x.fillStyle = '#fffdf7'; x.beginPath(); x.arc(r.toggle ? 256 + 20 : 256 - 20, vy, 10, 0, 6.3); x.fill(); return; }
-      x.fillStyle = r.dim ? 'rgba(255,255,255,.45)' : '#fffdf7'; fit(x, r.value, room, 25, 800); x.fillText(r.value, vx, vy + 1);
+      if (r.action) { x.fillStyle = r.danger ? '#ffb3ad' : '#fffdf7'; fit(x, r.label, b.w - 40, 28, 800); x.fillText(r.label, 256, b.y + b.h / 2 + 1); return; }
+      x.textAlign = 'left'; x.fillStyle = '#9fd8ff'; x.font = '700 17px Figtree, sans-serif'; x.fillText(r.label.toUpperCase(), b.x + 20, b.y + 17); x.textAlign = 'center';
+      const vy = b.y + 48, cl = b.x + 32, cr = b.x + b.w - 32, hz = hv && hv.id === 'row' && hv.i === i ? hv.zone : 0;
+      const btn = (cx, dir, glyph) => { const on = hz === dir; x.fillStyle = on ? '#ffc83a' : sel ? 'rgba(255,200,58,.25)' : 'rgba(255,255,255,.12)'; x.beginPath(); x.arc(cx, vy, 22, 0, 6.3); x.fill(); if (glyph) icn(x, glyph, cx, vy, on ? '#1d2030' : '#fffdf7'); else chev(x, cx, vy, dir, 8, on ? '#1d2030' : '#fffdf7'); };
+      if (r.name) { btn(cl, -1, 'pencil'); btn(cr, 1, 'dice'); } else if (!r.dim) { btn(cl, -1); btn(cr, 1); }
+      let vx = 256, room = b.w - 130;
+      if (r.icon) { const im = icon(r.icon); if (im.complete && im.naturalWidth) x.drawImage(im, b.x + 64, vy - 19, 38, 38); vx += 18; room -= 40; }
+      if (r.strip) { const ci = near(r.swatch); for (let k = -3; k <= 3; k++) { const s = SW[(ci + k + SW.length) % SW.length]; x.fillStyle = s; x.beginPath(); x.arc(256 + k * 36, vy, k ? 12 : 18, 0, 6.3); x.fill(); x.lineWidth = k ? 2 : 4; x.strokeStyle = k ? '#1d2030' : '#fffdf7'; x.stroke(); } return; }
+      if (r.swatch) { x.fillStyle = r.swatch; x.beginPath(); x.arc(b.x + 82, vy, 13, 0, 6.3); x.fill(); x.lineWidth = 2; x.strokeStyle = '#fffdf7'; x.stroke(); vx += 18; room -= 44; }
+      if (r.bar !== undefined) { rr(x, b.x + 66, vy - 7, b.w - 200, 14, 7); x.fillStyle = 'rgba(255,255,255,.15)'; x.fill(); rr(x, b.x + 66, vy - 7, Math.max(14, (b.w - 200) * r.bar), 14, 7); x.fillStyle = '#ffc83a'; x.fill(); x.textAlign = 'right'; x.fillStyle = '#fffdf7'; x.font = '800 22px Figtree, sans-serif'; x.fillText(r.value, b.x + b.w - 62, vy + 1); x.textAlign = 'center'; return; }
+      if (r.toggle !== undefined) { rr(x, 256 - 40, vy - 17, 80, 34, 17); x.fillStyle = r.toggle ? '#1fae7a' : 'rgba(255,255,255,.2)'; x.fill(); x.fillStyle = '#fffdf7'; x.beginPath(); x.arc(r.toggle ? 256 + 23 : 256 - 23, vy, 13, 0, 6.3); x.fill(); return; }
+      x.fillStyle = r.dim ? 'rgba(255,255,255,.45)' : '#fffdf7'; fit(x, r.value, room, 28, 800); x.fillText(r.value, vx, vy + 1);
     });
-    x.fillStyle = 'rgba(255,255,255,.55)'; x.font = '600 17px Figtree, sans-serif'; x.fillText(U.editing ? 'Type a name, then press Enter' : 'Tap a row, turn the ring to adjust', 256, 452);
+    x.fillStyle = 'rgba(255,255,255,.6)'; x.font = '600 19px Figtree, sans-serif'; x.fillText(U.editing ? 'Type a name, then press Enter' : 'Tap a row, turn the ring to adjust', 256, 450);
   }
   function redraw() { Room.thermoRedraw(); }
   function zoneAt(px, py, hand) {
@@ -2106,10 +2109,10 @@ const ThermoUI = window.ThermoUI = (() => {
     if (r.name) { act(r, f > 0.8 ? 1 : -1); return; } // name: tap to type, dice on the right
     act(r, f < 0.3 ? -1 : 1);
   }
-  function page(d) { const n = pages().length; U.page = (U.page + d + n) % n; U.sel = 0; stopEdit(); redraw(); say(`Thermostat: ${pages()[U.page].title}.`); }
+  function page(d) { const n = pages().length; U.page = (U.page + d + n) % n; U.sel = 0; stopEdit(); redraw(); }
   function turn(d) { const r = pages()[U.page].rows[U.sel]; if (!r) return; if (r.action) return; if (r.name) { act(r, 1); return; } r.step(d); }
   function button(id) { if (id === 'back') { stopEdit(); location.hash = 'room'; } else if (id === 'dice') { randomRoom(); redraw(); say('Fresh room, rolled at random.'); } else if (id === 'list') openList(); }
-  function hover(h, hand) { const z = h && h.part === 'screen' ? zoneAt(h.x, h.y, hand) : null; const key = z ? z.id + (z.i ?? '') : null; if ((U.hover && U.hover.key) === key) return; U.hover = z ? Object.assign({key}, z) : null; redraw(); }
+  function hover(h, hand) { const z = h && h.part === 'screen' ? zoneAt(h.x, h.y, hand) : null; const key = z ? z.id + (z.i ?? '') : null; const zone = z && z.id === 'row' ? ((h.x - z.x) / z.w < 0.3 ? -1 : (h.x - z.x) / z.w > 0.7 ? 1 : 0) : 0; const k2 = key + ':' + zone; if (U.hover && U.hover.k2 === k2) return; U.hover = z ? Object.assign({key, k2, zone}, z) : null; redraw(); }
   // names are typed into a real (hidden) text field and shown on the dial
   let blink = 0;
   function editName() { const inp = $('#thermoName'); U.editing = true; inp.value = Room.cfg().pets[U.pet].name; inp.focus({preventScroll: true}); inp.select(); clearInterval(blink); blink = setInterval(redraw, 450); redraw(); }
@@ -2124,7 +2127,7 @@ const ThermoUI = window.ThermoUI = (() => {
     else if (e.key === 'Enter' || e.key === ' ') { const r = P.rows[U.sel]; if (r.action) act(r); else if (r.name) editName(); else r.step(1); }
     else return false; return true;
   }
-  return {paint, tap, turn, button, hover, key, stopEdit, editing: () => U.editing, setName: v => { Room.set(c => { c.pets[U.pet].name = v.slice(0, 20) || 'Pet'; }, 'quiet'); redraw(); }};
+  return {paint, tap, turn, button, hover, key, zoneAt, stopEdit, editing: () => U.editing, setName: v => { Room.set(c => { c.pets[U.pet].name = v.slice(0, 20) || 'Pet'; }, 'quiet'); redraw(); }};
 })();
 const thermoName = $('#thermoName');
 thermoName.addEventListener('input', () => ThermoUI.setName(thermoName.value));
@@ -2134,7 +2137,7 @@ document.addEventListener('keydown', e => {
   if (S.station !== 'thermostat' || S.thermoList || ThermoUI.editing()) return; const t = e.target; if (t && t.matches && t.matches('input, textarea, select, button, a')) return;
   if (ThermoUI.key(e)) e.preventDefault();
 });
-$('#thermoListBtn').addEventListener('click', () => { S.thermoList = true; route(); });
+$('#thermoBar').addEventListener('click', e => { const b = e.target.closest('[data-tb]'); if (b) ThermoUI.button(b.dataset.tb); });
 $('#cfgDial').addEventListener('click', () => { S.thermoList = false; route(); });
 Room.thermoRedraw();
 $('#backRoom').addEventListener('click', () => { location.hash = 'room'; });
@@ -2213,7 +2216,7 @@ if (window.STUDIO_HOSTED) $('#importLbl').hidden = false;
   let peek = null;
   document.addEventListener('pointermove', e => { const a = e.target && e.target.closest ? e.target.closest('.room-bottom .stations a') : null; if (a === peek) return; if (peek) peek.classList.remove('peek'); peek = a; if (a) a.classList.add('peek'); });
 })();
-window.StudioHooks = {thermoScreen: (a, b, c) => Room.thermoScreen(a, b, c), petsInfo: () => Room.petsInfo(), _petPlace: (i, x, z) => Room.petPlace(i, x, z), look: (dx, dy) => Room.look(dx, dy), zoom: f => Room.zoom(f), isPetting: () => Room.isPetting(), rubInput: (x, h) => Room.rubInput(x, h), stopPetting: () => Room.stopPetting(), stand: on => Room.stand(on), playDead: () => Room.playDead(), overPet: (x, y) => Room.overPet(x, y), trick: () => Room.trick(), petScreen: i => Room.petScreen(i || 0), notice, stations: STATIONS};
+window.StudioHooks = {isThermo: () => Room.isThermo(), thermoOver: (x, y) => Room.thermoOver(x, y), thermoScreen: (a, b, c) => Room.thermoScreen(a, b, c), petsInfo: () => Room.petsInfo(), _petPlace: (i, x, z) => Room.petPlace(i, x, z), look: (dx, dy) => Room.look(dx, dy), zoom: f => Room.zoom(f), isPetting: () => Room.isPetting(), rubInput: (x, h) => Room.rubInput(x, h), stopPetting: () => Room.stopPetting(), stand: on => Room.stand(on), playDead: () => Room.playDead(), overPet: (x, y) => Room.overPet(x, y), trick: () => Room.trick(), petScreen: i => Room.petScreen(i || 0), notice, stations: STATIONS};
 /* ---------- boot ---------- */
 async function migrate() {
   const local = S.localItems.filter(x => !store.items.find(y => y.id === x.id));

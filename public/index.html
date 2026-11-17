@@ -22,8 +22,9 @@
       <span class="status-more"><button id="handSwap" class="chip" type="button" hidden>Pointer: right hand</button><button id="handCal" class="chip" type="button" hidden>Calibrate hands</button><span id="saveChip" class="chip">Opening the studio</span><span id="aiChip" class="chip">Claude: checking</span><span id="fpsChip" class="chip">-- fps</span></span>
     </div>
   </header>
-  <input id="thermoName" class="vh" type="text" maxlength="20" autocomplete="off" aria-label="Pet name" tabindex="-1"><button id="thermoListBtn" class="vh btn btn-sm" type="button" hidden>Thermostat settings as a list</button><div id="roomStage" class="room-stage"><p id="roomFallback" class="caption" hidden>The 3D room could not load on this device. Use the buttons below to visit each station.</p></div>
+  <input id="thermoName" class="vh" type="text" maxlength="20" autocomplete="off" aria-label="Pet name" tabindex="-1"><div id="roomStage" class="room-stage"><p id="roomFallback" class="caption" hidden>The 3D room could not load on this device. Use the buttons below to visit each station.</p></div>
   <div class="room-bottom hud hud-bottom">
+    <div id="thermoBar" class="thermo-bar" hidden><button class="btn btn-sm" type="button" data-tb="back"><span aria-hidden="true">←</span>Back</button><button class="btn btn-sm btn-yellow" type="button" data-tb="dice"><img src="assets/icons/game_die.webp" alt="">Surprise</button><button class="btn btn-sm" type="button" data-tb="list"><span aria-hidden="true">☰</span>List</button></div>
     <div id="hudMsgs" class="hud-msgs"><p id="handStatus" class="room-caption" hidden></p><p id="roomCaption" class="room-caption">Drag to look around. Tap anything in the room to use it.</p><p id="notice" class="notice" role="status" aria-live="polite"></p></div>
     <div class="dock-row">
     <nav class="stations" aria-label="Stations">
