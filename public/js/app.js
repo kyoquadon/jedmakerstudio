@@ -1591,7 +1591,7 @@ const Room = (() => {
       requestAnimationFrame(loop); if (document.hidden) { last = now; return; }
       const dt = Math.min(0.05, (now - last) / 1000); last = now;
       if (R.tw) { const k = Math.min(1, (now - R.tw.t0) / R.tw.dur); const e = ease(k); R.cur.pos.lerpVectors(R.tw.from.pos, R.tw.to.pos, e); R.cur.tgt.lerpVectors(R.tw.from.tgt, R.tw.to.tgt, e); if (k >= 1) R.tw = null; }
-      const c = R.camera; const off = new THREE.Vector3().subVectors(R.cur.pos, R.cur.tgt); off.applyAxisAngle(new THREE.Vector3(0, 1, 0), R.yaw); off.y += R.pitch * off.length(); c.position.copy(R.cur.tgt).add(off); c.lookAt(R.cur.tgt);
+      const c = R.camera; const off = new THREE.Vector3().subVectors(R.cur.pos, R.cur.tgt).multiplyScalar(R.zoomF || 1); off.applyAxisAngle(new THREE.Vector3(0, 1, 0), R.yaw); off.y += R.pitch * off.length(); c.position.copy(R.cur.tgt).add(off); c.lookAt(R.cur.tgt);
       const lt = (now - R.leverT) / 700; if (R.lever) R.lever.rotation.z = lt >= 0 && lt <= 1 ? -Math.sin(lt * Math.PI) * 0.9 : 0;
       if (now - skyT > 66) { skyT = now; drawSky(now); }
       R.sun.intensity = R.baseSun + (R.flash ? 2.2 : 0);
@@ -1627,8 +1627,9 @@ const Room = (() => {
       if (doc && doc.cfg && !R.pending) { const j = JSON.stringify(doc.cfg); if (j !== R.applied) { R.applied = j; CFG = mergeRoomCfg(doc.cfg); rebuildAll(); rebuildPets(); renderRoomCfg(); return; } }
       clearTimeout(rT); rT = setTimeout(refreshDyn, 250);
     },
-    focus(st) { if (!R) return; R.tw = {from: {pos: R.cur.pos.clone(), tgt: R.cur.tgt.clone()}, to: viewFor(st), t0: performance.now(), dur: reduceMotion ? 1 : 1100}; R.yaw = 0; R.pitch = 0; setHover(null); if (st && SPOT[st] && R.pets.length && Math.random() < 0.7) { const P = R.pets[0]; if (P.state !== 'sleep') walkTo(P, SPOT[st][0], SPOT[st][1], 'sit', performance.now()); } },
+    focus(st) { if (!R) return; R.tw = {from: {pos: R.cur.pos.clone(), tgt: R.cur.tgt.clone()}, to: viewFor(st), t0: performance.now(), dur: reduceMotion ? 1 : 1100}; R.yaw = 0; R.pitch = 0; R.zoomF = 1; setHover(null); if (st && SPOT[st] && R.pets.length && Math.random() < 0.7) { const P = R.pets[0]; if (P.state !== 'sleep') walkTo(P, SPOT[st][0], SPOT[st][1], 'sit', performance.now()); } },
     pulse(st) { if (R && st === 'machine') R.leverT = performance.now(); },
+    zoom(f) { if (!R || !isFinite(f)) return; R.zoomF = Math.max(0.45, Math.min(1.6, (R.zoomF || 1) * Math.max(0.85, Math.min(1.18, f)))); },
     look(dx, dy) { if (!R) return; const ym = R.camera.aspect < 0.8 ? 0.75 : 0.45; R.yaw = Math.max(-ym, Math.min(ym, R.yaw - dx * 0.003)); R.pitch = Math.max(-0.2, Math.min(0.25, R.pitch + dy * 0.002)); },
     cheer() { if (!R) return; const now = performance.now(); R.pets.forEach(P => { if (P.state !== 'sleep') { P.state = 'happy'; P.t0 = now; P.until = now + 1200; spawnFx('heart', P.x, 0.55, P.z); } }); },
     caption: () => R ? defaultCaption() : '',
@@ -1841,7 +1842,17 @@ $('#exToggle').textContent = S.hideEx ? 'Show examples' : 'Hide examples';
 $('#importFile').addEventListener('change', e => { const f = e.target.files[0]; if (f) importStudio(f); e.target.value = ''; });
 if (window.STUDIO_HOSTED) $('#importLbl').hidden = false;
 
-window.StudioHooks = {look: (dx, dy) => Room.look(dx, dy), notice, stations: STATIONS};
+
+/* minimal dock: icons only, label slides out on hover or hand-cursor hover, collapsible */
+(() => {
+  const btn = $('#dockToggle');
+  const set = min => { document.body.classList.toggle('dock-min', min); btn.setAttribute('aria-expanded', String(!min)); btn.setAttribute('aria-label', min ? 'Show the station bar' : 'Hide the station bar'); try { localStorage.setItem('studio-dock-min', min ? '1' : '0'); } catch (e) {} };
+  let min = false; try { min = localStorage.getItem('studio-dock-min') === '1'; } catch (e) {}
+  set(min); btn.addEventListener('click', () => set(!document.body.classList.contains('dock-min')));
+  let peek = null;
+  document.addEventListener('pointermove', e => { const a = e.target && e.target.closest ? e.target.closest('.room-bottom .stations a') : null; if (a === peek) return; if (peek) peek.classList.remove('peek'); peek = a; if (a) a.classList.add('peek'); });
+})();
+window.StudioHooks = {look: (dx, dy) => Room.look(dx, dy), zoom: f => Room.zoom(f), notice, stations: STATIONS};
 /* ---------- boot ---------- */
 async function migrate() {
   const local = S.localItems.filter(x => !store.items.find(y => y.id === x.id));
@@ -1854,7 +1865,7 @@ async function connect() {
   if (!(window.claude && typeof window.claude.use === 'function')) { setAI(); return; }
   setSave('connecting');
   claude.use('sample').then(s => { S.sample = s || null; setAI(); renderPins(); if (s && s.limits) s.limits().then(l => { S.imgOK = !!(l && l.images); }).catch(() => {}); }).catch(() => setAI());
-  const timer = setTimeout(() => { if (store.mode !== 'cloud') { setSave('local'); notice('Your studio storage is slow to answer, so changes are saving in this browser for now.'); } }, 10000);
+  const timer = setTimeout(() => { if (store.mode !== 'cloud' && !window.STUDIO_HOSTED) { setSave('local'); notice('Your studio storage is slow to answer, so changes are saving in this browser for now.'); } }, 10000);
   try {
     const [db, user] = await Promise.all([claude.use('db'), claude.use('user')]);
     if (!db || !user) { clearTimeout(timer); setSave('local'); return; }
