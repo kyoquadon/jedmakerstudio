@@ -1094,7 +1094,7 @@ const Room = (() => {
     const g = mesh.geometry; if (!g || mesh.userData.noOutline) return; g.computeBoundingSphere(); const r = g.boundingSphere.radius; if (r < 0.1) return;
     if (!INK.line) { INK.line = new THREE.LineBasicMaterial({color: 0x1d2030, transparent: true, opacity: 0.9}); INK.line.userData.shared = true; INK.hull = new THREE.MeshBasicMaterial({color: 0x1d2030, side: THREE.BackSide}); INK.hull.userData.shared = true; }
     if (g.type === 'BoxGeometry') { const e = new THREE.LineSegments(new THREE.EdgesGeometry(g, 25), INK.line); e.raycast = () => {}; mesh.add(e); }
-    else { const h = new THREE.Mesh(g, INK.hull); h.scale.setScalar(1 + 0.022 / r); h.raycast = () => {}; h.userData.hull = true; mesh.add(h); }
+    else { const h = new THREE.Mesh(g, INK.hull); h.scale.setScalar(1 + (R.petBuild ? 0.004 : 0.022) / r); h.raycast = () => {}; h.userData.hull = true; mesh.add(h); }
   }
   function add(mesh, parent, x, y, z) { mesh.position.set(x, y, z); mesh.castShadow = true; mesh.receiveShadow = true; outline(mesh); (parent || R.scene).add(mesh); return mesh; }
   function box(w, h, d, k, x, y, z, parent, o) { return add(new THREE.Mesh(new THREE.BoxGeometry(w, h, d), pm(k, o)), parent, x, y, z); }
@@ -1443,6 +1443,7 @@ const Room = (() => {
   function clearLine(x0, z0, x1, z1, P) { const d = Math.hypot(x1 - x0, z1 - z0); const n = Math.ceil(d / 0.15); for (let i = 1; i <= n; i++) { const t = i / n; if (!free(x0 + (x1 - x0) * t, z0 + (z1 - z0) * t, P)) return false; } return true; }
   function randFree(P) { for (let i = 0; i < 40; i++) { const x = (Math.random() - 0.5) * 9, z = (Math.random() - 0.5) * 7; if (free(x, z, P)) return [x, z]; } return [0.5, 0]; }
   function petMesh(cfg) {
+    R.petBuild = true;
     const k = cfg.kind, c = cfg.color, acc = shade(c, 0.18), dark = shade(c, -0.2);
     const root = new THREE.Group(); const body = new THREE.Group(); root.add(body);
     const P = {root, body, legs: [], tail: null, head: null, eyes: [], ears: [], wheel: null};
@@ -1477,6 +1478,7 @@ const Room = (() => {
       P.tail = new THREE.Group(); P.tail.position.set(0, 0.25 * s, -0.2 * s); body.add(P.tail); const tl = cyl(0.022, dog ? 0.03 : 0.018, dog ? 0.16 : 0.3, c, 0, (dog ? 0.08 : 0.15), 0, P.tail, 8); P.tail.rotation.x = dog ? -0.6 : -1.0;
       [[-0.07, 0.12], [0.07, 0.12], [-0.07, -0.12], [0.07, -0.12]].forEach(([dx, dz]) => { const lg = new THREE.Group(); lg.position.set(dx * s, 0.16 * s, dz * s); body.add(lg); cyl(0.03, 0.028, 0.16 * s, dark, 0, -0.08 * s, 0, lg, 8); P.legs.push(lg); });
     }
+    R.petBuild = false;
     root.scale.setScalar(1.25);
     root.traverse(o => { o.castShadow = true; });
     return P;
@@ -1521,8 +1523,17 @@ const Room = (() => {
       else { m.legs.forEach((l, j) => l.rotation.x = (j % 2 === (j < 2 ? 0 : 1) ? sw : -sw)); if (walking) y += Math.abs(Math.sin(t * 10 * sp)) * 0.02; }
       if (m.tail) { const wagF = P.cfg.kind === 'dog' ? (P.state === 'happy' || walking ? 18 : 6) : 2.5; m.tail.rotation.y = Math.sin(t * wagF) * (P.cfg.kind === 'dog' ? 0.6 : 0.35); }
       // states
-      m.body.scale.y = 1; m.head.rotation.x = 0;
-      if (P.state === 'sleep') { m.body.scale.y = 0.82; m.head.rotation.x = 0.45; m.eyes.forEach(e => e.scale.y = 0.15); if (!reduceMotion && now > (P.bub || 0)) { P.bub = now + 1400; spawnFx('bubble', P.x, 0.5, P.z); } }
+      m.body.scale.y = 1; m.head.rotation.x = 0; if (P.state !== 'petting') { m.head.rotation.z = 0; m.body.rotation.z = P.cfg.kind === 'robot' ? m.body.rotation.z : 0; }
+      if (P.state === 'petting') {
+        const cp = R.camera.position; const want = Math.atan2(cp.x - P.x, cp.z - P.z); let dh = want - P.heading; dh = Math.atan2(Math.sin(dh), Math.cos(dh)); P.heading += dh * Math.min(1, dt * 6);
+        const Pt = R.petting; const amt = Pt ? Pt.rubAmt : 0; if (Pt) Pt.rubAmt = Math.max(0, Pt.rubAmt - dt * 1.4);
+        m.head.rotation.z = Math.sin(t * 7) * 0.18 * amt; m.head.rotation.x = -0.15 * amt; m.body.rotation.z = Math.sin(t * 5) * 0.06 * amt;
+        y += Math.abs(Math.sin(t * 9)) * 0.03 * amt;
+        if (P.cfg.kind !== 'robot') m.eyes.forEach(e => e.scale.y = amt > 0.2 ? 0.25 : 1);
+        if (m.tail) m.tail.rotation.y = Math.sin(t * (6 + 14 * amt)) * 0.5;
+        m.ears.forEach((e, j) => e.rotation.z = (j ? -1 : 1) * 0.25 * amt);
+      }
+      else if (P.state === 'sleep') { m.body.scale.y = 0.82; m.head.rotation.x = 0.45; m.eyes.forEach(e => e.scale.y = 0.15); if (!reduceMotion && now > (P.bub || 0)) { P.bub = now + 1400; spawnFx('bubble', P.x, 0.5, P.z); } }
       else if (P.state === 'happy') { const k = (now - P.t0) / 1200; y += Math.abs(Math.sin(k * Math.PI * 3)) * 0.18 * (1 - Math.min(1, k)); if (P.cfg.kind === 'dog' || P.cfg.kind === 'robot') P.heading += dt * 7 * (1 - Math.min(1, k)); m.eyes.forEach(e => e.scale.y = P.cfg.kind === 'robot' ? 1 : 0.4); }
       else if (P.state === 'play') { const k = now / 1000; if (P.cfg.kind === 'otter') P.heading += dt * 3; else if (P.cfg.kind === 'bunny') { y += Math.abs(Math.sin(k * 5)) * 0.2; m.body.rotation.y = Math.sin(k * 5) * 0.6; } else if (P.cfg.kind === 'cat') { y += Math.max(0, Math.sin(k * 3)) * 0.12; } else P.heading += dt * 2.5; }
       else { if (now > P.blinkAt) { P.blinkAt = now + 2500 + Math.random() * 3000; P.blinkEnd = now + 130; } m.eyes.forEach(e => e.scale.y = now < (P.blinkEnd || 0) && P.cfg.kind !== 'robot' ? 0.15 : 1); if (P.state === 'idle' || P.state === 'sit') m.head.rotation.y = Math.sin(t * 0.7 + i) * 0.5; }
@@ -1531,13 +1542,43 @@ const Room = (() => {
       m.root.position.set(P.x, y, P.z); m.root.rotation.y = P.heading;
     });
   }
-  function petIt(i) {
-    const P = R.pets[i]; if (!P) return; const now = performance.now();
-    P.state = 'happy'; P.t0 = now; P.until = now + 1500;
-    for (let k = 0; k < 6; k++) setTimeout(() => spawnFx('heart', P.x + (Math.random() - 0.5) * 0.3, 0.55, P.z + (Math.random() - 0.5) * 0.3), k * 110);
-    if (CFG.sound) petSound(P.cfg.kind);
-    $('#roomCaption').textContent = `${P.cfg.name} ${pick(PET_LINES[P.cfg.kind])}`;
-    const pc = CFG.pets.find(p => p.kind === P.cfg.kind); if (pc) { pc.petted = (pc.petted || 0) + 1; P.cfg.petted = pc.petted; scheduleSave(); }
+  function petIt(i) { startPetting(i); }
+  function startPetting(i) {
+    const P = R.pets[i]; if (!P) return; if (R.petting && R.petting.i === i) return; if (R.petting) endPetting(true);
+    const now = performance.now();
+    R.petting = {i, rubs: 0, rubAmt: 0, dir: 0, start: 0, lastX: null, done: false, back: R.focusSt || null, t0: now};
+    P.state = 'petting'; P.until = Infinity; P.way = null;
+    const cp = R.camera.position; const dx = cp.x - P.x, dz = cp.z - P.z, d = Math.hypot(dx, dz) || 1;
+    const tgt = new THREE.Vector3(P.x, 0.35, P.z), pos = new THREE.Vector3(P.x + dx / d * 1.35, 0.95, P.z + dz / d * 1.35);
+    R.tw = {from: {pos: R.cur.pos.clone(), tgt: R.cur.tgt.clone()}, to: {pos, tgt}, t0: now, dur: reduceMotion ? 1 : 900}; R.yaw = 0; R.pitch = 0; R.zoomF = 1;
+    $('#roomCaption').textContent = `Give ${P.cfg.name} a rub: move your cursor back and forth over ${P.cfg.kind === 'robot' ? 'it' : 'them'}, or rub with an open hand. Click anywhere else to stop.`;
+  }
+  function endPetting(silent) {
+    const Pt = R.petting; if (!Pt) return; R.petting = null;
+    const P = R.pets[Pt.i]; const now = performance.now();
+    if (P) { P.state = 'happy'; P.t0 = now; P.until = now + 1200; }
+    if (!silent) Room.focus(Pt.back, true);
+  }
+  function rubbed() {
+    const Pt = R.petting; if (!Pt || Pt.done) return; const P = R.pets[Pt.i]; if (!P) return;
+    Pt.rubs++; Pt.rubAmt = 1;
+    spawnFx('heart', P.x + (Math.random() - 0.5) * 0.25, 0.6, P.z + (Math.random() - 0.5) * 0.25);
+    if (CFG.sound && Pt.rubs % 2 === 1) petSound(P.cfg.kind);
+    if (Pt.rubs === 3) $('#roomCaption').textContent = `${P.cfg.name} is loving this. Keep going.`;
+    if (Pt.rubs >= 6) {
+      Pt.done = true;
+      for (let k = 0; k < 9; k++) setTimeout(() => spawnFx('heart', P.x + (Math.random() - 0.5) * 0.5, 0.5 + Math.random() * 0.3, P.z + (Math.random() - 0.5) * 0.5), k * 90);
+      $('#roomCaption').textContent = `${P.cfg.name} ${pick(PET_LINES[P.cfg.kind])}`;
+      const pc = CFG.pets.find(p => p.kind === P.cfg.kind); if (pc) { pc.petted = (pc.petted || 0) + 1; P.cfg.petted = pc.petted; scheduleSave(); }
+      setTimeout(() => { if (R.petting === Pt) endPetting(); }, 2400);
+    }
+  }
+  function rubInput(x, isHand) {
+    const Pt = R.petting; if (!Pt || Pt.done) return;
+    if (Pt.lastX === null) { Pt.lastX = x; return; }
+    const prevX = Pt.lastX; Pt.lastX = x; const dx = x - prevX; if (Math.abs(dx) < 0.5) return; const d = Math.sign(dx);
+    if (!Pt.dir) { Pt.dir = d; Pt.start = prevX; return; }
+    if (d !== Pt.dir) { if (Math.abs(prevX - Pt.start) > (isHand ? 30 : 22)) rubbed(); Pt.start = prevX; Pt.dir = d; }
   }
   function heartTex() { return ctex(64, 64, (x) => { x.fillStyle = '#ff5b8a'; x.beginPath(); x.moveTo(32, 54); x.bezierCurveTo(4, 34, 6, 10, 22, 10); x.bezierCurveTo(28, 10, 32, 16, 32, 20); x.bezierCurveTo(32, 16, 36, 10, 42, 10); x.bezierCurveTo(58, 10, 60, 34, 32, 54); x.fill(); x.strokeStyle = '#1d2030'; x.lineWidth = 3; x.stroke(); }); }
   function spawnFx(kind, x, y, z) {
@@ -1589,8 +1630,8 @@ const Room = (() => {
     const el = renderer.domElement; let down = null; const ray = new THREE.Raycaster(); const v2 = new THREE.Vector2();
     const pickAt = (cx, cy) => { const r = el.getBoundingClientRect(); v2.set(((cx - r.left) / r.width) * 2 - 1, -((cy - r.top) / r.height) * 2 + 1); ray.setFromCamera(v2, camera); const ph = ray.intersectObjects(R.petsG.children, true)[0]; if (ph && ph.object.userData.pet !== undefined) return {pet: ph.object.userData.pet}; const hits = ray.intersectObjects(Object.values(R.groups), true); for (const h of hits) { let o = h.object; while (o && !o.userData.station) o = o.parent; if (o) return {st: o.userData.station}; } return null; };
     el.addEventListener('pointerdown', e => { down = {x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY}; try { el.setPointerCapture(e.pointerId); } catch (er) {} ac(); if (R.ac && R.ac.state === 'suspended') R.ac.resume(); });
-    el.addEventListener('pointermove', e => { if (down) { const ym = R.camera.aspect < 0.8 ? 0.75 : 0.45; R.yaw = Math.max(-ym, Math.min(ym, R.yaw - (e.clientX - down.x) * 0.003)); R.pitch = Math.max(-0.2, Math.min(0.25, R.pitch + (e.clientY - down.y) * 0.002)); down.x = e.clientX; down.y = e.clientY; return; } if (e.pointerType === 'mouse') setHover(pickAt(e.clientX, e.clientY)); });
-    el.addEventListener('pointerup', e => { const moved = down ? Math.hypot(e.clientX - down.sx, e.clientY - down.sy) : 99; down = null; if (moved < 6) { const h = pickAt(e.clientX, e.clientY); if (h && h.pet !== undefined) petIt(h.pet); else if (h && h.st) { Room.pulse(h.st); goto(h.st); } } });
+    el.addEventListener('pointermove', e => { if (R.petting) { const h = pickAt(e.clientX, e.clientY); if (h && h.pet === R.petting.i) rubInput(e.clientX, false); return; } if (down) { const ym = R.camera.aspect < 0.8 ? 0.75 : 0.45; R.yaw = Math.max(-ym, Math.min(ym, R.yaw - (e.clientX - down.x) * 0.003)); R.pitch = Math.max(-0.2, Math.min(0.25, R.pitch + (e.clientY - down.y) * 0.002)); down.x = e.clientX; down.y = e.clientY; return; } if (e.pointerType === 'mouse') setHover(pickAt(e.clientX, e.clientY)); });
+    el.addEventListener('pointerup', e => { const moved = down ? Math.hypot(e.clientX - down.sx, e.clientY - down.sy) : 99; down = null; if (moved < 6) { const h = pickAt(e.clientX, e.clientY); if (R.petting && !(h && h.pet === R.petting.i)) { endPetting(!(h && h.st)); if (!h || !h.st) return; } if (h && h.pet !== undefined) petIt(h.pet); else if (h && h.st) { Room.pulse(h.st); goto(h.st); } } });
     el.addEventListener('pointerleave', () => setHover(null));
     new ResizeObserver(resize).observe(stage); resize();
     let last = performance.now(), skyT = 0;
@@ -1615,6 +1656,7 @@ const Room = (() => {
     return true;
   }
   function setHover(h) {
+    if (R.petting) return;
     const key = h ? (h.pet !== undefined ? 'pet' + h.pet : h.st) : null; if (R.hover === key) return; R.hover = key;
     const st = h && h.st;
     Object.entries(R.groups).forEach(([k, g]) => g.traverse(o => { if (o.material && o.material.emissive && o.material.userData) { if (o.userData.baseE === undefined) o.userData.baseE = o.material.emissive.getHex(); o.material.emissive.setHex(k === st ? 0x2a1a00 : o.userData.baseE); } }));
@@ -1634,8 +1676,12 @@ const Room = (() => {
       if (doc && doc.cfg && !R.pending) { const j = JSON.stringify(doc.cfg); if (j !== R.applied) { R.applied = j; CFG = mergeRoomCfg(doc.cfg); rebuildAll(); rebuildPets(); renderRoomCfg(); return; } }
       clearTimeout(rT); rT = setTimeout(refreshDyn, 250);
     },
-    focus(st) { if (!R) return; R.tw = {from: {pos: R.cur.pos.clone(), tgt: R.cur.tgt.clone()}, to: viewFor(st), t0: performance.now(), dur: reduceMotion ? 1 : 1100}; R.yaw = 0; R.pitch = 0; R.zoomF = 1; setHover(null); if (st && SPOT[st] && R.pets.length && Math.random() < 0.7) { const P = R.pets[0]; if (P.state !== 'sleep') walkTo(P, SPOT[st][0], SPOT[st][1], 'sit', performance.now()); } },
+    focus(st, fromPet) { if (!R) return; if (R.petting && !fromPet) endPetting(true); R.focusSt = st || null; R.tw = {from: {pos: R.cur.pos.clone(), tgt: R.cur.tgt.clone()}, to: viewFor(st), t0: performance.now(), dur: reduceMotion ? 1 : 1100}; R.yaw = 0; R.pitch = 0; R.zoomF = 1; if (fromPet) R.hover = null; else setHover(null); if (st && SPOT[st] && R.pets.length && Math.random() < 0.7) { const P = R.pets[0]; if (P.state !== 'sleep') walkTo(P, SPOT[st][0], SPOT[st][1], 'sit', performance.now()); } },
     pulse(st) { if (R && st === 'machine') R.leverT = performance.now(); },
+    isPetting() { return !!(R && R.petting); },
+    petScreen(i) { if (!R || !R.pets[i]) return null; const P = R.pets[i]; const v = new THREE.Vector3(P.x, 0.3, P.z).project(R.camera); const r = R.renderer.domElement.getBoundingClientRect(); return {x: r.left + (v.x + 1) / 2 * r.width, y: r.top + (1 - v.y) / 2 * r.height}; },
+    rubInput(x, isHand) { if (R) rubInput(x, isHand); },
+    stopPetting() { if (R && R.petting) endPetting(); },
     zoom(f) { if (!R || !isFinite(f)) return; R.zoomF = Math.max(0.45, Math.min(1.6, (R.zoomF || 1) * Math.max(0.85, Math.min(1.18, f)))); },
     look(dx, dy) { if (!R) return; const ym = R.camera.aspect < 0.8 ? 0.75 : 0.45; R.yaw = Math.max(-ym, Math.min(ym, R.yaw - dx * 0.003)); R.pitch = Math.max(-0.2, Math.min(0.25, R.pitch + dy * 0.002)); },
     cheer() { if (!R) return; const now = performance.now(); R.pets.forEach(P => { if (P.state !== 'sleep') { P.state = 'happy'; P.t0 = now; P.until = now + 1200; spawnFx('heart', P.x, 0.55, P.z); } }); },
@@ -1786,7 +1832,7 @@ thermoSec.addEventListener('click', e => {
   if (e.target.closest('#cfgReset')) { Room.replace(Object.assign(defaultRoomCfg(), {pets: Room.cfg().pets})); renderRoomCfg(); }
 });
 $('#backRoom').addEventListener('click', () => { location.hash = 'room'; });
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#panel').hidden) location.hash = 'room'; });
+document.addEventListener('keydown', e => { if (e.key !== 'Escape') return; if (Room.isPetting()) { Room.stopPetting(); return; } if (!$('#panel').hidden) location.hash = 'room'; });
 $('#skipDaily').addEventListener('click', () => { S.dailyOffset++; $('#dailyText').textContent = dailyPrompt(); });
 $('#timerStart').addEventListener('click', timerToggle);
 $('#timerReset').addEventListener('click', timerReset);
@@ -1861,7 +1907,7 @@ if (window.STUDIO_HOSTED) $('#importLbl').hidden = false;
   let peek = null;
   document.addEventListener('pointermove', e => { const a = e.target && e.target.closest ? e.target.closest('.room-bottom .stations a') : null; if (a === peek) return; if (peek) peek.classList.remove('peek'); peek = a; if (a) a.classList.add('peek'); });
 })();
-window.StudioHooks = {look: (dx, dy) => Room.look(dx, dy), zoom: f => Room.zoom(f), notice, stations: STATIONS};
+window.StudioHooks = {look: (dx, dy) => Room.look(dx, dy), zoom: f => Room.zoom(f), isPetting: () => Room.isPetting(), rubInput: (x, h) => Room.rubInput(x, h), stopPetting: () => Room.stopPetting(), petScreen: i => Room.petScreen(i || 0), notice, stations: STATIONS};
 /* ---------- boot ---------- */
 async function migrate() {
   const local = S.localItems.filter(x => !store.items.find(y => y.id === x.id));
