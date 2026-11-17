@@ -1089,7 +1089,14 @@ const Room = (() => {
   function mat(color, o) { return new THREE.MeshStandardMaterial(Object.assign({color, roughness: 0.78, flatShading: true}, o || {})); }
   function M(key, o) { const m = mat(CFG.parts[key].color, o); m.userData.part = key; return m; }
   const pm = (k, o) => (typeof k === 'string' && CFG.parts[k]) ? M(k, o) : mat(k, o);
-  function add(mesh, parent, x, y, z) { mesh.position.set(x, y, z); mesh.castShadow = true; mesh.receiveShadow = true; (parent || R.scene).add(mesh); return mesh; }
+  const INK = {}; 
+  function outline(mesh) {
+    const g = mesh.geometry; if (!g || mesh.userData.noOutline) return; g.computeBoundingSphere(); const r = g.boundingSphere.radius; if (r < 0.1) return;
+    if (!INK.line) { INK.line = new THREE.LineBasicMaterial({color: 0x1d2030, transparent: true, opacity: 0.9}); INK.line.userData.shared = true; INK.hull = new THREE.MeshBasicMaterial({color: 0x1d2030, side: THREE.BackSide}); INK.hull.userData.shared = true; }
+    if (g.type === 'BoxGeometry') { const e = new THREE.LineSegments(new THREE.EdgesGeometry(g, 25), INK.line); e.raycast = () => {}; mesh.add(e); }
+    else { const h = new THREE.Mesh(g, INK.hull); h.scale.setScalar(1 + 0.022 / r); h.raycast = () => {}; h.userData.hull = true; mesh.add(h); }
+  }
+  function add(mesh, parent, x, y, z) { mesh.position.set(x, y, z); mesh.castShadow = true; mesh.receiveShadow = true; outline(mesh); (parent || R.scene).add(mesh); return mesh; }
   function box(w, h, d, k, x, y, z, parent, o) { return add(new THREE.Mesh(new THREE.BoxGeometry(w, h, d), pm(k, o)), parent, x, y, z); }
   function cyl(rt, rb, h, k, x, y, z, parent, seg, o) { return add(new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, seg || 16), pm(k, o)), parent, x, y, z); }
   function sph(r, k, x, y, z, parent, o) { return add(new THREE.Mesh(new THREE.SphereGeometry(r, 16, 12), pm(k, o)), parent, x, y, z); }
@@ -1097,7 +1104,7 @@ const Room = (() => {
   function setMap(mesh, t) { const old = mesh.material.map; mesh.material.map = t; mesh.material.needsUpdate = true; if (old) old.dispose(); }
   function wrapText(x, text, maxW) { const ws = String(text || '').split(/\s+/); const lines = []; let line = ''; for (const w of ws) { const t = line ? line + ' ' + w : w; if (x.measureText(t).width > maxW && line) { lines.push(line); line = w; } else line = t; } if (line) lines.push(line); return lines; }
   function fitText(x, t, maxW) { t = String(t || ''); while (x.measureText(t).width > maxW && t.length > 2) t = t.slice(0, -2) + '…'; return t; }
-  function clearGroup(g) { while (g.children.length) { const c = g.children.pop(); c.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) { const ms = Array.isArray(o.material) ? o.material : [o.material]; ms.forEach(m => { if (m.map && m.map !== R.skyTex) m.map.dispose(); m.dispose(); }); } }); } }
+  function clearGroup(g) { while (g.children.length) { const c = g.children.pop(); c.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) { const ms = Array.isArray(o.material) ? o.material : [o.material]; ms.forEach(m => { if (m.userData && m.userData.shared) return; if (m.map && m.map !== R.skyTex) m.map.dispose(); m.dispose(); }); } }); } }
   function group(st) { if (!R.groups[st]) { const g = new THREE.Group(); g.userData.station = st; R.scene.add(g); R.groups[st] = g; } const g = R.groups[st]; clearGroup(g); const d = new THREE.Group(); g.add(d); R.dyn[st] = d; return g; }
   function shade(hex, f) { const c = new THREE.Color(hex); const hsl = {}; c.getHSL(hsl); c.setHSL(hsl.h, hsl.s, Math.max(0, Math.min(1, hsl.l + f))); return '#' + c.getHexString(); }
 
@@ -1843,6 +1850,8 @@ $('#importFile').addEventListener('change', e => { const f = e.target.files[0]; 
 if (window.STUDIO_HOSTED) $('#importLbl').hidden = false;
 
 
+/* floating messages fade after a few seconds */
+(() => { const m = $('#hudMsgs'); let t; const wake = () => { m.classList.remove('fade'); clearTimeout(t); t = setTimeout(() => m.classList.add('fade'), 6000); }; new MutationObserver(wake).observe(m, {subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['hidden']}); m.addEventListener('pointerenter', wake); wake(); })();
 /* minimal dock: icons only, label slides out on hover or hand-cursor hover, collapsible */
 (() => {
   const btn = $('#dockToggle');

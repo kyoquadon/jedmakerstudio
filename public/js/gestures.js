@@ -98,12 +98,12 @@
       }
       stream = await navigator.mediaDevices.getUserMedia({video: {width: 640, height: 480, facingMode: 'user'}, audio: false});
       video = video || Object.assign(document.createElement('video'), {playsInline: true, muted: true}); video.srcObject = stream; await video.play();
-      running = true; prev.hidden = false; cursor.hidden = false; btn.textContent = 'Hand control: on'; btn.setAttribute('aria-pressed', 'true'); say(help()); loop();
+      running = true; prev.hidden = false; cursor.hidden = false; (document.getElementById('handLbl') || btn).textContent = 'Hand control: on'; btn.setAttribute('aria-pressed', 'true'); say(help()); loop();
       const sw = document.getElementById('handSwap'); if (sw) sw.hidden = false;
     } catch (e) { console.warn(e); say(e && e.name === 'NotAllowedError' ? 'Camera permission was declined. Allow the camera for this site in your browser settings, then try again.' : 'Hand tracking could not start. Check that no other app is using the camera.'); stop(true); }
     btn.disabled = false;
   }
-  function stop(keepMsg) { running = false; P.pinched = false; two = null; if (stream) stream.getTracks().forEach(t => t.stop()); stream = null; prev.hidden = true; cursor.hidden = true; btn.textContent = 'Hand control: off'; btn.setAttribute('aria-pressed', 'false'); const sw = document.getElementById('handSwap'); if (sw) sw.hidden = true; if (!keepMsg) say(''); }
+  function stop(keepMsg) { running = false; P.pinched = false; two = null; if (stream) stream.getTracks().forEach(t => t.stop()); stream = null; prev.hidden = true; cursor.hidden = true; (document.getElementById('handLbl') || btn).textContent = 'Hand control: off'; btn.setAttribute('aria-pressed', 'false'); const sw = document.getElementById('handSwap'); if (sw) sw.hidden = true; if (!keepMsg) say(''); }
   btn.addEventListener('click', () => running ? stop() : start());
   const sw = document.getElementById('handSwap');
   if (sw) { sw.textContent = lefty ? 'Pointer: left hand' : 'Pointer: right hand'; sw.addEventListener('click', () => { lefty = !lefty; try { localStorage.setItem('studio-lefty', lefty ? '1' : '0'); } catch (e) {} sw.textContent = lefty ? 'Pointer: left hand' : 'Pointer: right hand'; if (running) say(help()); }); }

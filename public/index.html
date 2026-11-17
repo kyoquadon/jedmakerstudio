@@ -12,15 +12,19 @@
 </head>
 <body>
 <div class="room-view">
-  <header class="room-top">
-    <div class="brand"><img src="assets/icons/hammer_and_wrench.webp" alt="" width="38" height="38"><div><h1>Maker's Studio</h1><p class="hand">the room</p></div></div>
-    <div class="chips"><canvas id="handPreview" width="96" height="72" hidden aria-label="Camera preview with hand tracking dots"></canvas><button id="handBtn" class="chip" type="button" hidden aria-pressed="false">Hand control: off</button><button id="handSwap" class="chip" type="button" hidden>Pointer: right hand</button><a id="critChip" class="chip due" href="#mirror" hidden>Studio crit due</a><span id="saveChip" class="chip">Opening the studio</span><span id="aiChip" class="chip">Claude: checking</span></div>
+  <header class="room-top hud hud-top">
+    <a class="hud-pill brand-pill" href="#room" aria-label="Maker's Studio, back to the room"><img src="assets/icons/hammer_and_wrench.webp" alt="" width="28" height="28"><span class="lbl-t"><b>Maker's Studio</b></span></a>
+    <div class="hud-pill status-pill">
+      <canvas id="handPreview" width="96" height="72" hidden aria-label="Camera preview with hand tracking dots"></canvas>
+      <button id="handBtn" class="hud-btn" type="button" hidden aria-pressed="false" aria-label="Hand control"><img src="assets/icons/raised_hand.webp" alt="" width="24" height="24"><span class="lbl-t" id="handLbl">Hand control: off</span></button>
+      <a id="critChip" class="chip due" href="#mirror" hidden>Crit due</a>
+      <span class="status-dot" aria-hidden="true"></span>
+      <span class="status-more"><button id="handSwap" class="chip" type="button" hidden>Pointer: right hand</button><span id="saveChip" class="chip">Opening the studio</span><span id="aiChip" class="chip">Claude: checking</span></span>
+    </div>
   </header>
   <div id="roomStage" class="room-stage"><p id="roomFallback" class="caption" hidden>The 3D room could not load on this device. Use the buttons below to visit each station.</p></div>
-  <div class="room-bottom">
-    <p id="handStatus" class="room-caption" hidden></p>
-    <p id="roomCaption" class="room-caption">Drag to look around. Tap anything in the room to use it.</p>
-    <p id="notice" class="notice" role="status" aria-live="polite"></p>
+  <div class="room-bottom hud hud-bottom">
+    <div id="hudMsgs" class="hud-msgs"><p id="handStatus" class="room-caption" hidden></p><p id="roomCaption" class="room-caption">Drag to look around. Tap anything in the room to use it.</p><p id="notice" class="notice" role="status" aria-live="polite"></p></div>
     <div class="dock-row">
     <nav class="stations" aria-label="Stations">
     <a href="#workbench" data-st="workbench" aria-label="Workbench"><img src="assets/icons/hammer_and_wrench.webp" alt=""><span class="lbl-t">Workbench</span></a>
