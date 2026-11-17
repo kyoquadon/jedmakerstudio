@@ -4,25 +4,25 @@
    just before your fingers closed, so the pinch itself can't drag anything).
    Open palm moved around = look around the room.
    Both hands pinched: pull apart or push together to zoom, twist to turn.
-   Closed fist (hold) = back to the room. Thumb, index and middle finger held out, moved up or down = scroll the panel. Thumbs up (hold) = save. */
+   Closed fist (hold) = back to the room. Pinch thumb, index and middle finger together, then drag up or down = scroll the open page. Thumbs up (hold) = save. */
 (() => {
   'use strict';
   const MP = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.0';
   const MODEL = 'https://storage.googleapis.com/mediapipe-models/gesture_recognizer/gesture_recognizer/float16/1/gesture_recognizer.task';
   const SAVE = {workbench: '#saveEntry', pinboard: '#savePin', corner: '#chatSend', gallery: '#pcSave', playground: '#logSave', wall: '#blockSave'};
-  const PINCH_ON = 0.3, PINCH_OFF = 0.45, PINCH_FRAMES = 2;
+  const PINCH_ON = 0.3, PINCH_OFF = 0.45, PINCH_FRAMES = 3;
   const btn = document.getElementById('handBtn'), status = document.getElementById('handStatus'), prev = document.getElementById('handPreview');
   if (!btn) return;
   btn.hidden = false;
   let lefty = false; try { lefty = localStorage.getItem('studio-lefty') === '1'; } catch (e) {}
   let rec = null, video = null, stream = null, running = false, lastVT = -1;
   const cur = {x: innerWidth / 2, y: innerHeight / 2}; const hist = [];
-  const P = {pinched: false, onCount: 0, fistSince: 0, fistDone: false, thumbSince: 0, thumbDone: false, palm: null, peace: null, lost: 0};
+  const P = {grab: null, pinched: false, onCount: 0, fistSince: 0, fistDone: false, thumbSince: 0, thumbDone: false, palm: null, peace: null, lost: 0};
   let two = null; // {d, a} while both hands pinch
   const hands2 = {L: false, R: false};
   const cursor = document.createElement('div'); cursor.className = 'hand-cursor lost'; cursor.hidden = true; cursor.setAttribute('aria-hidden', 'true'); document.body.appendChild(cursor);
   const say = t => { status.hidden = !t; status.textContent = t || ''; };
-  const help = () => `Hand control on (${lefty ? 'left' : 'right'} hand points). Point to move, pinch to click, wave an open palm to look around, pinch with both hands and pull apart to zoom or twist to turn, hold a fist for the room, hold out thumb, index and middle finger and move up or down to scroll, hold a thumbs up to save.`;
+  const help = () => `Hand control on (${lefty ? 'left' : 'right'} hand points). Point to move, pinch to click, wave an open palm to look around, pinch with both hands and pull apart to zoom or twist to turn, hold a fist for the room, pinch thumb, index and middle finger together and drag to scroll the page, hold a thumbs up to save.`;
   const clamp = v => Math.max(0, Math.min(1, v));
   const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
   const H = window.StudioHooks || {};
@@ -43,16 +43,13 @@
     if (n === 1) { out.pointer = hands[0]; return out; }
     out.pointer = hands.find(h => h.label === want) || hands[0]; out.other = hands.find(h => h !== out.pointer) || null; return out;
   }
-  const ext = (lm, tip, pip) => dist(lm[tip], lm[0]) > dist(lm[pip], lm[0]) * 1.12;
-  function threeFinger(lm) {
-    const size = dist(lm[0], lm[9]) || 0.1;
-    const thumbOut = dist(lm[4], lm[5]) / size > 0.55 && dist(lm[4], lm[5]) > dist(lm[3], lm[5]) * 1.15;
-    return thumbOut && ext(lm, 8, 6) && ext(lm, 12, 10) && !ext(lm, 16, 14) && !ext(lm, 20, 18);
-  }
+  // three-finger pinch: thumb, index and middle fingertips all touching
+  function triPinch(lm) { const s = dist(lm[0], lm[9]) || 0.1; return dist(lm[4], lm[8]) / s < 0.38 && dist(lm[4], lm[12]) / s < 0.45 && dist(lm[8], lm[12]) / s < 0.35; }
+  const middleNear = lm => dist(lm[4], lm[12]) / (dist(lm[0], lm[9]) || 0.1) < 0.5;
   const pinchRatio = lm => dist(lm[4], lm[8]) / (dist(lm[0], lm[9]) || 0.1);
   function handle(res, now) {
     const {pointer, other} = sortHands(res);
-    if (!pointer) { cursor.classList.add('lost'); P.pinched = false; P.onCount = 0; P.palm = P.peace = null; P.fistSince = P.thumbSince = 0; two = null; return; }
+    if (!pointer) { cursor.classList.add('lost'); cursor.classList.remove('grab'); P.grab = null; P.pinched = false; P.onCount = 0; P.palm = P.peace = null; P.fistSince = P.thumbSince = 0; two = null; return; }
     cursor.classList.remove('lost');
     const lm = pointer.lm, g = pointer.g;
     // two-hand pinch: zoom and turn
@@ -68,9 +65,16 @@
     const pr = pinchRatio(lm);
     if (!P.pinched) { cur.x += (tx - cur.x) * 0.35; cur.y += (ty - cur.y) * 0.35; hist.push({x: cur.x, y: cur.y, t: now}); while (hist.length && now - hist[0].t > 400) hist.shift(); }
     cursor.style.transform = `translate(${cur.x}px, ${cur.y}px)`;
+    // three-finger pinch = grab the open page and drag it up or down (no click)
+    if (triPinch(lm)) {
+      const gy = (lm[4].y + lm[8].y + lm[12].y) / 3 * innerHeight;
+      const pb = document.querySelector('.panel:not([hidden]) .panel-body');
+      if (P.grab !== null && pb) { const dy = gy - P.grab; if (Math.abs(dy) > 1) pb.scrollTop -= dy * 2.6; }
+      P.grab = gy; P.pinched = true; P.onCount = 0; cursor.classList.add('pinch', 'grab');
+    } else if (P.grab !== null) { P.grab = null; cursor.classList.remove('grab'); }
     // pinch = click at where the cursor was ~150 ms before the fingers met
     if (!P.pinched) {
-      if (pr < PINCH_ON) { if (++P.onCount >= PINCH_FRAMES) { P.pinched = true; P.onCount = 0; const back = hist.find(h => now - h.t <= 150) || hist[0] || cur; cur.x = back.x; cur.y = back.y; cursor.style.transform = `translate(${cur.x}px, ${cur.y}px)`; cursor.classList.add('pinch'); clickAt(cur); } }
+      if (pr < PINCH_ON && !middleNear(lm)) { if (++P.onCount >= PINCH_FRAMES) { P.pinched = true; P.onCount = 0; const back = hist.find(h => now - h.t <= 150) || hist[0] || cur; cur.x = back.x; cur.y = back.y; cursor.style.transform = `translate(${cur.x}px, ${cur.y}px)`; cursor.classList.add('pinch'); clickAt(cur); } }
       else { P.onCount = 0; pe('pointermove', at(cur), cur); }
     } else if (pr > PINCH_OFF) { P.pinched = false; cursor.classList.remove('pinch'); }
     // gestures from either hand
@@ -87,14 +91,7 @@
     }
     const palmHand = other && other.g === 'Open_Palm' ? other : (g === 'Open_Palm' && !P.pinched ? pointer : null);
     if (palmHand) { const px = (1 - palmHand.lm[0].x) * innerWidth, py = palmHand.lm[0].y * innerHeight; if (P.palm && H.look) H.look((px - P.palm.x) * 1.4, (py - P.palm.y) * 0.6); P.palm = {x: px, y: py}; } else P.palm = null;
-    // scroll: thumb, index and middle fingers held out (ring and little finger folded), whole hand moved up or down
-    const scrollHand = threeFinger(pointer.lm) ? pointer : (other && threeFinger(other.lm) ? other : null);
-    if (scrollHand && !P.pinched) {
-      const L = scrollHand.lm; const py = (L[4].y + L[8].y + L[12].y) / 3 * innerHeight;
-      const pb = document.querySelector('.panel:not([hidden]) .panel-body');
-      if (P.peace !== null && pb) { const dy = py - P.peace; if (Math.abs(dy) > 1.5) pb.scrollTop += dy * 2.6; }
-      P.peace = py;
-    } else P.peace = null;
+
   }
   function draw(res) {
     if (!prev || prev.hidden) return; const x = prev.getContext('2d'); x.drawImage(video, 0, 0, prev.width, prev.height);

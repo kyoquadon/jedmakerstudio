@@ -44,7 +44,7 @@ Cloudflare's dashboard menus get renamed now and then, so a label below might be
 | Pinch thumb and index finger | Click: opens a station, pets a pet, presses a button |
 | Pinch and drag, or move an open palm sideways | Looks around the room |
 | Hold a closed fist (about half a second) | Back to the room |
-| Thumb, index and middle finger held out, moved up or down | Scrolls the open panel |
+| Pinch thumb, index and middle finger together, then drag up or down | Grabs the open page and scrolls it |
 | Hold a thumbs up | Saves what you're working on |
 
 For the best tracking, face a light source, keep your hand 40 to 70 cm from the laptop, and keep the background plain.
