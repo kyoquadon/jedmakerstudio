@@ -1848,6 +1848,7 @@ const Room = (() => {
     playDead() { if (R) playDead(); },
     isThermo() { return !!(R && R.thermoOn && R.focusSt === 'thermostat' && !R.petting); },
     thermoOver(x, y) { if (!R || !R.thermoOn) return false; const h = thermoPick(x, y, true); if (!h || h.part === 'plate') return false; return h.part === 'ring' || !!(window.ThermoUI && ThermoUI.zoneAt(h.x, h.y, true)); },
+    thermoDial() { if (!R || !R.thermoOn) return null; const r = R.renderer.domElement.getBoundingClientRect(); const pr = v => { v.project(R.camera); return {x: r.left + (v.x + 1) / 2 * r.width, y: r.top + (1 - v.y) / 2 * r.height}; }; const c = pr(new THREE.Vector3(-4.4, 2.5, -3.925)), e = pr(new THREE.Vector3(-4.4 + 0.225, 2.5, -3.925)); return {x: c.x, y: c.y, r: Math.hypot(e.x - c.x, e.y - c.y)}; },
     thermoTwist(d) { if (R && R.thermoOn) twist(d); },
     thermoGrip(on) { if (window.ThermoUI) ThermoUI.grip(!!on); },
     thermoMode(on) { if (!R) return; on = !!on; if (R.thermoOn === on) return; R.thermoOn = on; if (on) setHover(null); drawThermo(); },
@@ -2219,7 +2220,7 @@ if (window.STUDIO_HOSTED) $('#importLbl').hidden = false;
   let peek = null;
   document.addEventListener('pointermove', e => { const a = e.target && e.target.closest ? e.target.closest('.room-bottom .stations a') : null; if (a === peek) return; if (peek) peek.classList.remove('peek'); peek = a; if (a) a.classList.add('peek'); });
 })();
-window.StudioHooks = {thermoTwist: d => Room.thermoTwist(d), thermoGrip: on => Room.thermoGrip(on), isThermo: () => Room.isThermo(), thermoOver: (x, y) => Room.thermoOver(x, y), thermoScreen: (a, b, c) => Room.thermoScreen(a, b, c), petsInfo: () => Room.petsInfo(), _petPlace: (i, x, z) => Room.petPlace(i, x, z), look: (dx, dy) => Room.look(dx, dy), zoom: f => Room.zoom(f), isPetting: () => Room.isPetting(), rubInput: (x, h) => Room.rubInput(x, h), stopPetting: () => Room.stopPetting(), stand: on => Room.stand(on), playDead: () => Room.playDead(), overPet: (x, y) => Room.overPet(x, y), trick: () => Room.trick(), petScreen: i => Room.petScreen(i || 0), notice, stations: STATIONS};
+window.StudioHooks = {thermoDial: () => Room.thermoDial(), thermoTwist: d => Room.thermoTwist(d), thermoGrip: on => Room.thermoGrip(on), isThermo: () => Room.isThermo(), thermoOver: (x, y) => Room.thermoOver(x, y), thermoScreen: (a, b, c) => Room.thermoScreen(a, b, c), petsInfo: () => Room.petsInfo(), _petPlace: (i, x, z) => Room.petPlace(i, x, z), look: (dx, dy) => Room.look(dx, dy), zoom: f => Room.zoom(f), isPetting: () => Room.isPetting(), rubInput: (x, h) => Room.rubInput(x, h), stopPetting: () => Room.stopPetting(), stand: on => Room.stand(on), playDead: () => Room.playDead(), overPet: (x, y) => Room.overPet(x, y), trick: () => Room.trick(), petScreen: i => Room.petScreen(i || 0), notice, stations: STATIONS};
 /* ---------- boot ---------- */
 async function migrate() {
   const local = S.localItems.filter(x => !store.items.find(y => y.id === x.id));

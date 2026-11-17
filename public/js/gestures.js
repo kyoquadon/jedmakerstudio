@@ -64,7 +64,7 @@
       const t = handPts(handsS[0].lm)[8]; const fw = Math.min(innerWidth, innerHeight) * 0.17 * 0.3; cur.x = t.x; cur.y = t.y - fw * 0.15; hoverDue = true;
       if (!P.pinched) { hist.push({x: cur.x, y: cur.y, t: now}); while (hist.length && now - hist[0].t > 400) hist.shift(); }
       if (now - lastHover > 33 && !P.pinched) { hoverDue = false; lastHover = now; pe('pointermove', at(cur), cur); }
-      if (now - dialOverT > 120 && H.thermoOver) { dialOverT = now; const o = H.thermoOver(cur.x, cur.y) || !!(at(cur) && at(cur).closest && at(cur).closest('.thermo-bar button')); if (handsT[0]) handsT[0].over = o; P.dialOver = o; }
+      if (now - dialOverT > 120 && H.thermoOver) { dialOverT = now; const o = H.thermoOver(cur.x, cur.y) || !!(at(cur) && at(cur).closest && at(cur).closest('.thermo-bar button')); if (handsT[0]) handsT[0].over = o || !!P.twist; P.dialOver = o; }
     } else if (!cursor.hidden) {
       const dx = tgt.x - cur.x, dy = tgt.y - cur.y;
       if (Math.abs(dx) + Math.abs(dy) > 0.2) { cur.x += dx * a; cur.y += dy * a; place(cursor, cur); hoverDue = true; }
@@ -78,7 +78,7 @@
     } else if (!ovClear) { handsS = []; drawHands([]); ovClear = true; }
   }
   const say = t => { status.hidden = !t; status.textContent = t || ''; };
-  const help = () => `Hand control on (${lefty ? 'left' : 'right'} hand points). Point to move, pinch to click, wave an open palm to look around, pinch with both hands and pull apart to zoom or twist to turn, pinch thumb, index and middle finger together and drag to scroll (on the thermostat, hold that pinch and twist your wrist to turn the dial), hold a fist for the room, hold a thumbs up to save, and while zoomed in on a pet: clap for a trick, make a finger gun to make it stand, then shoot for play dead. Use Calibrate if anything feels off.`;
+  const help = () => `Hand control on (${lefty ? 'left' : 'right'} hand points). Point to move, pinch to click, wave an open palm to look around, pinch with both hands and pull apart to zoom or twist to turn, pinch thumb, index and middle finger together and drag to scroll (on the thermostat, lay an open palm on the dial and rotate your hand, or hold that pinch and twist, to turn the dial), hold a fist for the room, hold a thumbs up to save, and while zoomed in on a pet: clap for a trick, make a finger gun to make it stand, then shoot for play dead. Use Calibrate if anything feels off.`;
   const clamp = v => Math.max(0, Math.min(1, v));
   const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
   const H = window.StudioHooks || {};
@@ -205,15 +205,23 @@
     // cursor follows the index fingertip, smoothed
     const pr = pinchRatio(lm);
     if (!P.pinched && !dial) { tgt.x = mapX(lm[8].x); tgt.y = mapY(lm[8].y); }
-    // on the thermostat: pinch thumb, index and middle together as if holding a knob, then twist the wrist to turn it
+    // on the thermostat the dial is bigger than a hand, so there are two ways to grab it:
+    //  - lay an open palm anywhere on the dial (plus a margin) and rotate the hand, like turning a big wheel
+    //  - or pinch thumb, index and middle together anywhere, like holding a small knob, and twist the wrist
     if (dial) {
       const knuckle = h => Math.atan2((h[17].y - h[5].y) * 480, -(h[17].x - h[5].x) * 640);
-      if (triPinch(lm)) {
-        const a = knuckle(lm); P.twistSeen = now;
-        if (!P.twist) { P.twist = {a, acc: 0}; H.thermoGrip && H.thermoGrip(true); }
-        else { let da = a - P.twist.a; da = Math.atan2(Math.sin(da), Math.cos(da)); P.twist.a = a; P.twist.acc += da; while (Math.abs(P.twist.acc) >= 0.35) { const d = Math.sign(P.twist.acc); P.twist.acc -= d * 0.35; H.thermoTwist && H.thermoTwist(d); } }
-        P.pinched = true; P.onCount = 0; if (handsT[0]) handsT[0].over = true;
-      } else if (P.twist && now - (P.twistSeen || 0) > 160) { P.twist = null; H.thermoGrip && H.thermoGrip(false); }
+      const palmAng = h => Math.atan2((h[9].y - h[0].y) * 480, -(h[9].x - h[0].x) * 640);
+      const open = g === 'Open_Palm' || [8, 12, 16, 20].filter(i => dist(lm[i], lm[0]) > dist(lm[i - 2], lm[0]) * 1.12).length >= 3;
+      const D = H.thermoDial && H.thermoDial(), pal = petPalm(lm), handR = Math.min(innerWidth, innerHeight) * 0.17;
+      const onDial = !!D && Math.hypot(pal.x - D.x, pal.y - D.y) < D.r * 1.2 + handR * 0.6;
+      const kind = triPinch(lm) ? 'knob' : (open && onDial ? 'palm' : null);
+      if (kind) {
+        const a = kind === 'knob' ? knuckle(lm) : palmAng(lm); P.twistSeen = now;
+        if (!P.twist || P.twist.kind !== kind) { P.twist = {kind, a, acc: 0}; H.thermoGrip && H.thermoGrip(true); }
+        else { let da = a - P.twist.a; da = Math.atan2(Math.sin(da), Math.cos(da)); P.twist.a = a; P.twist.acc += da; const stepA = kind === 'palm' ? 0.3 : 0.35; while (Math.abs(P.twist.acc) >= stepA) { const d = Math.sign(P.twist.acc); P.twist.acc -= d * stepA; H.thermoTwist && H.thermoTwist(d); } }
+        if (kind === 'knob') { P.pinched = true; P.onCount = 0; }
+        if (handsT[0]) handsT[0].over = true;
+      } else if (P.twist && now - (P.twistSeen || 0) > 220) { P.twist = null; H.thermoGrip && H.thermoGrip(false); }
     } else if (P.twist) { P.twist = null; }
     // three-finger pinch = grab the open page and drag it up or down (no click)
     if (!dial && triPinch(lm)) {
