@@ -53,24 +53,25 @@
       <div class="grid-2">
         <div class="sheet pad">
           <div class="sec-head"><div><h2 id="h-work">Workbench</h2><p class="hint">Thoughts, learnings, things you noticed today.</p></div></div>
+          <div id="benchBlocks" class="bench-blocks">
+          <div class="blk" data-blk="prompt"><div class="blk-head"><span class="lbl">Prompt card</span><button class="blk-x" type="button" data-blkx="prompt" aria-label="Remove the prompt card from this entry" title="Remove the prompt card">×</button></div>
           <div class="deck">
             <button id="drawPrompt" class="btn btn-yellow" type="button"><img src="assets/icons/joker.webp" alt="">Draw a prompt</button>
             <div id="promptCard" class="prompt-card"><span id="promptText" class="hand">Draw a card when you don't know where to start.</span></div>
-          </div>
-          <div class="field">
-            <label for="entryText">What's on your mind?</label>
+          </div></div>
+          <div class="blk field" data-blk="title"><div class="blk-head"><label for="entryTitle">Title</label><button class="blk-x" type="button" data-blkx="title" aria-label="Remove the title from this entry" title="Remove the title">×</button></div>
+            <input id="entryTitle" type="text" maxlength="90" placeholder="A name for this one"></div>
+          <div class="blk field" data-blk="text"><div class="blk-head"><label for="entryText">What's on your mind?</label><button class="blk-x" type="button" data-blkx="text" aria-label="Remove the writing from this entry" title="Remove the writing">×</button></div>
             <textarea id="entryText" rows="6" placeholder="Something you noticed, learned, or can't stop thinking about"></textarea>
           </div>
-          <div class="field">
-            <span class="lbl" id="lbl-medium">Medium itch</span>
+          <div class="blk field" data-blk="medium"><div class="blk-head"><span class="lbl" id="lbl-medium">Medium itch</span><button class="blk-x" type="button" data-blkx="medium" aria-label="Remove medium from this entry" title="Remove medium">×</button></div>
             <div class="row" role="radiogroup" aria-labelledby="lbl-medium">
               <label class="pick"><input type="radio" name="medium" value="physical" id="m-physical"><span>Physical</span></label>
               <label class="pick"><input type="radio" name="medium" value="digital" id="m-digital"><span>Digital</span></label>
               <label class="pick"><input type="radio" name="medium" value="mixed" id="m-mixed" checked><span>Mixed</span></label>
             </div>
           </div>
-          <div class="field">
-            <span class="lbl" id="lbl-energy">Energy</span>
+          <div class="blk field" data-blk="energy"><div class="blk-head"><span class="lbl" id="lbl-energy">Energy</span><button class="blk-x" type="button" data-blkx="energy" aria-label="Remove energy from this entry" title="Remove energy">×</button></div>
             <div class="row" role="radiogroup" aria-labelledby="lbl-energy">
               <label class="pick"><input type="radio" name="energy" value="1" id="en-1"><span>1</span></label>
               <label class="pick"><input type="radio" name="energy" value="2" id="en-2"><span>2</span></label>
@@ -79,11 +80,18 @@
               <label class="pick"><input type="radio" name="energy" value="5" id="en-5"><span>5</span></label>
             </div>
           </div>
+          <div class="blk field" data-blk="tags"><div class="blk-head"><label for="entryTags">Tags</label><button class="blk-x" type="button" data-blkx="tags" aria-label="Remove tags from this entry" title="Remove tags">×</button></div>
+            <input id="entryTags" type="text" maxlength="120" placeholder="Words separated by commas, like light, texture, bus"></div>
+          <div class="blk field" data-blk="link"><div class="blk-head"><label for="entryLink">Link</label><button class="blk-x" type="button" data-blkx="link" aria-label="Remove the link from this entry" title="Remove the link">×</button></div>
+            <input id="entryLink" type="url" maxlength="400" placeholder="https://"></div>
+          <div class="blk" data-blk="photo"><div class="blk-head"><span class="lbl">Photo</span><button class="blk-x" type="button" data-blkx="photo" aria-label="Remove the photo from this entry" title="Remove the photo">×</button></div>
           <div class="row">
             <label class="btn btn-sm" for="entryPhoto">Attach a photo</label>
             <input type="file" id="entryPhoto" accept="image/*" class="vh">
             <span id="photoName" class="hint"></span>
+          </div></div>
           </div>
+          <div class="blk-add"><span class="lbl" id="lbl-add">Add to this entry</span><div id="blkAdd" class="row" role="group" aria-labelledby="lbl-add"></div></div>
           <button id="saveEntry" class="btn btn-blue big" type="button">Pin it to the bench</button>
         </div>
         <div class="sheet pad">

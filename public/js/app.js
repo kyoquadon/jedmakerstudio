@@ -121,7 +121,7 @@ const creative = () => { const m = store.items.filter(x => ['entry','pin','spark
 
 function label(it) {
   if (!it) return '';
-  if (it.kind === 'entry') return clip(it.text || 'Photo entry', 60);
+  if (it.kind === 'entry') return clip(it.title || it.text || (it.tags && it.tags.length ? '#' + it.tags.join(' #') : '') || (it.link ? 'Link entry' : 'Photo entry'), 60);
   if (it.kind === 'spark') return clip(it.text, 60);
   if (it.kind === 'concept') return it.title || 'Untitled concept';
   if (it.kind === 'play') return clip(it.made || it.prompt, 60);
@@ -136,7 +136,7 @@ function label(it) {
 }
 function bodyText(it) {
   if (!it) return '';
-  if (it.kind === 'entry') return (it.prompt ? 'Prompt: ' + it.prompt + '\n' : '') + (it.text || '') + (it.photo ? ' [has a photo]' : '');
+  if (it.kind === 'entry') return (it.title ? 'Title: ' + it.title + '\n' : '') + (it.prompt ? 'Prompt: ' + it.prompt + '\n' : '') + (it.text || '') + (it.tags ? '\nTags: ' + it.tags.join(', ') : '') + (it.link ? '\nLink: ' + it.link : '') + (it.photo ? ' [has a photo]' : '');
   if (it.kind === 'spark') return it.text;
   if (it.kind === 'concept') return `${it.title}: ${it.premise} (medium: ${it.medium}; ${it.composted ? 'composted' : 'stage: ' + STAGES[it.stage || 0]})`;
   if (it.kind === 'play') return `Warm-up (${it.type}): ${it.prompt}. What he made: ${it.made || '[photo]'}. Felt: ${it.feel || ''}`;
@@ -203,7 +203,7 @@ async function enrich(id) {
   try {
     const v = await S.sample.json(`Read this ${it.kind === 'pin' ? 'inspiration pin' : 'journal entry'} from an artist's studio${opts.images ? ' (the image is attached)' : ''}. Return only JSON: {"themes": ["3 to 5 short lowercase themes: recurring ideas, motifs, materials or moods, one or two words each"]}\n"""${bodyText(it)}"""`, opts);
     const th = ((v && v.themes) || []).filter(x => typeof x === 'string').map(x => x.toLowerCase().trim().slice(0, 28)).filter(Boolean).slice(0, 5);
-    const cur = find(id); if (th.length && cur && !cur.example) { cur.themes = th; put(cur); }
+    const cur = find(id); if (th.length && cur && !cur.example) { cur.themes = (cur.tags || []).concat(th).filter((t, i, a) => a.indexOf(t) === i).slice(0, 6); put(cur); }
   } catch (e) { aiErr(e, true); }
 }
 
@@ -218,10 +218,12 @@ function renderTally() {
 /* ---------- workbench ---------- */
 function entryCard(e) {
   return `<article class="card ${e.example ? 'is-ex' : ''}" data-id="${esc(e.id)}">
-    <div class="card-top"><span class="date">${fmtDate(e.created)}</span>${e.example ? '<span class="chip chip-ex">Example</span>' : ''}<span class="chip m-${esc(e.medium)}">${esc(cap(e.medium))}</span><span class="energy" aria-label="Energy ${e.energy} of 5">${'●'.repeat(e.energy || 0)}${'○'.repeat(5 - (e.energy || 0))}</span></div>
+    <div class="card-top"><span class="date">${fmtDate(e.created)}</span>${e.example ? '<span class="chip chip-ex">Example</span>' : ''}${e.medium ? `<span class="chip m-${esc(e.medium)}">${esc(cap(e.medium))}</span>` : ''}${e.energy ? `<span class="energy" aria-label="Energy ${e.energy} of 5">${'●'.repeat(e.energy)}${'○'.repeat(5 - e.energy)}</span>` : ''}</div>
+    ${e.title ? `<h3 class="entry-title">${esc(e.title)}</h3>` : ''}
     ${e.prompt ? `<p class="hand prompt-echo">${esc(e.prompt)}</p>` : ''}
     ${S.editing === e.id ? `<label class="vh" for="edit-${esc(e.id)}">Edit entry</label><textarea id="edit-${esc(e.id)}" rows="5">${esc(e.text)}</textarea><div class="actions">${actBtn('editsave', 'Save changes', 'btn-blue')}${actBtn('editcancel', 'Cancel')}</div>` : (e.text ? `<p class="wrap-text">${esc(e.text)}</p>` : '')}
     ${isImg(e.photo) ? `<img class="thumb" src="${esc(e.photo)}" alt="Photo attached to this entry">` : ''}
+    ${e.link && /^https?:\/\//i.test(e.link) ? `<p><a href="${esc(e.link)}" target="_blank" rel="noopener">${esc(clip(e.link.replace(/^https?:\/\//, ''), 60))}</a></p>` : ''}
     ${themeChips(e)}
     ${S.editing === e.id ? '' : `<div class="actions">${actBtn('talk', 'Talk it through')}${actBtn('scrap', S.scraps.includes(e.id) ? 'In the Idea Machine' : 'Send to Idea Machine')}${e.example ? actBtn('hideex', 'Hide examples') : actBtn('edit', 'Edit') + actBtn('del', 'Delete')}</div>`}
   </article>`;
@@ -229,7 +231,7 @@ function entryCard(e) {
 function renderJournal() {
   const q = $('#journalSearch').value.trim().toLowerCase();
   let list = withEx('entry');
-  if (q) list = list.filter(e => ((e.text || '') + ' ' + itemThemes(e).join(' ')).toLowerCase().includes(q));
+  if (q) list = list.filter(e => ([e.title, e.text, (e.tags || []).join(' ')].join(' ') + ' ' + itemThemes(e).join(' ')).toLowerCase().includes(q));
   const exNote = !mine('entry').length && !S.hideEx ? '<p class="caption">These three are examples so the studio isn\'t empty. They disappear as soon as you pin your first entry, or you can hide them now.</p>' : '';
   $('#journalList').innerHTML = exNote + (list.length ? list.map(entryCard).join('') : (q ? '<p class="hint">Nothing matches that search.</p>' : '<p class="caption">Your journal is empty. Write your first entry and press Pin it to the bench.</p>'));
   if (S.editing) { const ta = document.getElementById('edit-' + S.editing); if (ta && document.activeElement !== ta) ta.focus(); }
@@ -661,11 +663,11 @@ function drawMirror() {
     ctx.closePath(); ctx.strokeStyle = PAL[i % PAL.length]; ctx.lineWidth = 2 + (n / max) * 6; ctx.lineJoin = 'round'; ctx.stroke();
   });
   $('#fpLegend').innerHTML = fp.map(([t, n], i) => `<li><span class="sw" style="background:${PAL[i % PAL.length]}"></span><span class="nm">${esc(t)}<span class="bar" style="width:${Math.round(n / max * 100)}%;background:${PAL[i % PAL.length]}"></span></span><span class="ct">${n}</span></li>`).join('') || '<li>Add journal entries and pins to grow your fingerprint.</li>';
-  const ents = withEx('entry'); const mc = {physical: 0, digital: 0, mixed: 0}; ents.forEach(e => mc[e.medium] = (mc[e.medium] || 0) + 1);
-  const tot = ents.length || 1; const mcol = {physical: '#ffc83a', digital: '#2f5bea', mixed: '#ff8fc8'};
+  const ents = withEx('entry'); const mc = {physical: 0, digital: 0, mixed: 0}; ents.forEach(e => { if (mc[e.medium] !== undefined) mc[e.medium]++; });
+  const tot = (mc.physical + mc.digital + mc.mixed) || 1; const mcol = {physical: '#ffc83a', digital: '#2f5bea', mixed: '#ff8fc8'};
   $('#mix').innerHTML = `<div class="mix-bar" role="img" aria-label="Physical ${mc.physical}, digital ${mc.digital}, mixed ${mc.mixed}">${Object.keys(mc).map(k => `<span style="width:${mc[k] / tot * 100}%;background:${mcol[k]}"></span>`).join('')}</div><div class="row">${Object.keys(mc).map(k => `<span class="chip"><span class="sw" style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${mcol[k]};border:1px solid #1d2030"></span>${cap(k)} ${Math.round(mc[k] / tot * 100)}%</span>`).join('')}</div>`;
   const sp = $('#spark'); const w = Math.max(200, sp.clientWidth || 300), h = 90; sp.width = w * dpr; sp.height = h * dpr; const sx = sp.getContext('2d'); sx.setTransform(dpr, 0, 0, dpr, 0, 0); sx.clearRect(0, 0, w, h);
-  const es = ents.slice().sort((a, b) => a.created - b.created).slice(-30).map(e => e.energy || 3);
+  const es = ents.slice().sort((a, b) => a.created - b.created).filter(e => e.energy).slice(-30).map(e => e.energy);
   sx.strokeStyle = '#e6dccb'; sx.lineWidth = 1; [1, 3, 5].forEach(v => { const y = h - 8 - (v - 1) / 4 * (h - 16); sx.beginPath(); sx.moveTo(0, y); sx.lineTo(w, y); sx.stroke(); });
   if (es.length > 1) {
     const pts = es.map((v, i) => [8 + i / (es.length - 1) * (w - 16), h - 8 - (v - 1) / 4 * (h - 16)]);
@@ -1952,12 +1954,33 @@ $('#drawPrompt').addEventListener('click', () => {
   S.prompt = p; $('#promptText').textContent = p; const c = $('#promptCard'); c.classList.remove('flip'); void c.offsetWidth; c.classList.add('flip');
 });
 $('#entryPhoto').addEventListener('change', async e => { const f = e.target.files[0]; if (!f) return; try { S.entryPhoto = await fileToDataURL(f, 900); $('#photoName').textContent = 'Photo ready: ' + clip(f.name, 30); } catch (er) { notice('That photo could not be read. Try a JPG or PNG.'); } });
+/* the bench is modular: each part of an entry can be removed or added back, and the layout is remembered */
+const BLOCKS = [['prompt', 'Prompt card'], ['title', 'Title'], ['text', 'Writing'], ['medium', 'Medium'], ['energy', 'Energy'], ['tags', 'Tags'], ['link', 'Link'], ['photo', 'Photo']];
+const BLK_DEFAULT = ['prompt', 'text', 'medium', 'energy', 'photo'];
+let benchOn = (() => { try { const v = JSON.parse(localStorage.getItem('studio-bench-layout')); if (Array.isArray(v) && v.every(k => BLOCKS.some(b => b[0] === k))) return v; } catch (e) {} return BLK_DEFAULT.slice(); })();
+function renderBench(focusKey) {
+  $$('#benchBlocks [data-blk]').forEach(el => { el.hidden = !benchOn.includes(el.dataset.blk); });
+  const off = BLOCKS.filter(([k]) => !benchOn.includes(k));
+  $('#blkAdd').innerHTML = off.length ? off.map(([k, n]) => `<button class="btn btn-sm" type="button" data-blkadd="${k}"><span aria-hidden="true">+</span> ${esc(n)}</button>`).join('') : '<span class="hint">Everything is on the bench.</span>';
+  $('#saveEntry').disabled = !benchOn.length;
+  if (focusKey) { const el = $(`#benchBlocks [data-blk="${focusKey}"]`); const f = el && el.querySelector('input:not([type=file]):not([type=radio]), textarea, button'); if (f) f.focus(); }
+}
+function setBench(list, focusKey) { benchOn = BLOCKS.map(b => b[0]).filter(k => list.includes(k)); try { localStorage.setItem('studio-bench-layout', JSON.stringify(benchOn)); } catch (e) {} renderBench(focusKey); }
+$('#benchBlocks').addEventListener('click', e => { const x = e.target.closest('[data-blkx]'); if (!x) return; const k = x.dataset.blkx; setBench(benchOn.filter(b => b !== k)); const nxt = $('#blkAdd [data-blkadd="' + k + '"]'); if (nxt) nxt.focus(); });
+$('#blkAdd').addEventListener('click', e => { const a = e.target.closest('[data-blkadd]'); if (!a) return; setBench(benchOn.concat(a.dataset.blkadd), a.dataset.blkadd); });
+renderBench();
 $('#saveEntry').addEventListener('click', () => {
-  const text = $('#entryText').value.trim();
-  if (!text && !S.entryPhoto) return notice('Write something or attach a photo first.');
-  const it = {id: nid('e'), kind: 'entry', created: Date.now(), text, medium: val('medium') || 'mixed', energy: +(val('energy') || 3), prompt: S.prompt, photo: S.entryPhoto, themes: localThemes(text, 4)};
+  const on = k => benchOn.includes(k);
+  const text = on('text') ? $('#entryText').value.trim() : '', title = on('title') ? $('#entryTitle').value.trim() : '';
+  const tags = on('tags') ? $('#entryTags').value.split(',').map(t => t.trim().toLowerCase()).filter(Boolean).slice(0, 8) : [];
+  let link = on('link') ? $('#entryLink').value.trim() : ''; if (link && !/^https?:\/\//i.test(link)) link = 'https://' + link;
+  const photo = on('photo') ? S.entryPhoto : '';
+  if (!text && !photo && !title && !tags.length && !link) return notice('Add something first: words, a title, tags, a link or a photo.');
+  const it = {id: nid('e'), kind: 'entry', created: Date.now(), text, prompt: on('prompt') ? S.prompt : '', photo, themes: tags.concat(localThemes([title, text].join(' '), 4)).filter((t, i, a) => a.indexOf(t) === i).slice(0, 6)};
+  if (title) it.title = title; if (tags.length) it.tags = tags; if (link) it.link = link;
+  if (on('medium')) it.medium = val('medium') || 'mixed'; if (on('energy')) it.energy = +(val('energy') || 3);
   put(it);
-  $('#entryText').value = ''; S.entryPhoto = ''; $('#entryPhoto').value = ''; $('#photoName').textContent = ''; S.prompt = ''; $('#promptText').textContent = 'Draw a card when you don\'t know where to start.';
+  $('#entryText').value = ''; $('#entryTitle').value = ''; $('#entryTags').value = ''; $('#entryLink').value = ''; S.entryPhoto = ''; $('#entryPhoto').value = ''; $('#photoName').textContent = ''; S.prompt = ''; $('#promptText').textContent = 'Draw a card when you don\'t know where to start.';
   notice('Pinned to the bench.');
   enrich(it.id);
 });

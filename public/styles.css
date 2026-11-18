@@ -55,6 +55,17 @@ input[type=text],input[type=url],input[type=search],textarea,select{font:inherit
 textarea{resize:vertical}
 label,.lbl{font-weight:700;font-size:.92rem}
 .field{display:flex;flex-direction:column;gap:6px}
+.bench-blocks{display:flex;flex-direction:column;gap:14px}
+.blk{display:flex;flex-direction:column;gap:6px;padding:10px 12px;border:2px dashed transparent;border-radius:14px;transition:border-color .15s}
+.blk:hover,.blk:focus-within{border-color:#e6dccb}
+.blk[hidden]{display:none!important}
+.blk-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.blk-x{flex:none;width:32px;height:32px;border-radius:50%;border:2px solid var(--ink);background:#fff;font-weight:800;font-size:1.1rem;line-height:1;cursor:pointer}
+.blk-x:hover{background:var(--red);color:#fff}
+.blk-add{display:flex;flex-direction:column;gap:6px;margin:12px 0}
+.blk-add .btn{min-height:36px}
+.entry-title{margin:4px 0;font-size:1.05rem}
+.chip-tag{background:#f3ecdf}
 .pick{position:relative;display:inline-flex}
 .pick input{position:absolute;opacity:0;inset:0;margin:0;cursor:pointer}
 .pick span{padding:5px 12px;border:2px solid var(--ink);border-radius:999px;background:#fff;font-weight:600;font-size:.9rem}
