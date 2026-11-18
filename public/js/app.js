@@ -1591,6 +1591,7 @@ const Room = (() => {
   function clearLine(x0, z0, x1, z1, P) { const d = Math.hypot(x1 - x0, z1 - z0); const n = Math.ceil(d / 0.15); for (let i = 1; i <= n; i++) { const t = i / n; if (!free(x0 + (x1 - x0) * t, z0 + (z1 - z0) * t, P)) return false; } return true; }
   function randFree(P) { let fb = null; for (let i = 0; i < 40; i++) { const x = (Math.random() - 0.5) * 9, z = (Math.random() - 0.5) * 7; if (!free(x, z, P)) continue; if (!fb) fb = [x, z]; if (!(R.pets || []).some(Q => Q !== P && Math.hypot(Q.x - x, Q.z - z) < 0.7)) return [x, z]; } return fb || [0.5, 0]; }
   function petMesh(cfg) {
+    const am = animPetMesh(cfg); if (am) return am;
     R.petBuild = true;
     const k = cfg.kind, c = cfg.color, acc = shade(c, 0.18), dark = shade(c, -0.2);
     const root = new THREE.Group(); const body = new THREE.Group(); root.add(body);
@@ -1630,6 +1631,64 @@ const Room = (() => {
     root.scale.setScalar(1.25);
     root.traverse(o => { o.castShadow = true; });
     return P;
+  }
+  /* ---------- animated pet models (CC0): skeletal clips blended with an AnimationMixer ---------- */
+  const PET_MODELS = {
+    cat: {file: 'cat.glb', h: 0.42, hide: ['cat_LOD1'], tint: 0.4, clips: {idle: 'idle', idle2: 'idle_alt', walk: 'walk', run: 'run', jump: 'jump', sit: 'sit', sleep: 'sleep', sniff: 'eat', death: 'death', play: 'call', petting: 'idle_alt'}},
+    dog: {file: 'dog.glb', h: 0.5, tint: 0.22, clips: {idle: 'Idle', idle2: 'Idle_2', walk: 'Walk', run: 'Gallop', jump: 'Jump_ToIdle', sit: 'Idle_2_HeadLow', sleep: 'Idle_2_HeadLow', sniff: 'Eating', death: 'Death', play: 'Gallop_Jump', petting: 'Idle_2'}},
+    bunny: {file: 'bunny/rabbit.fbx', fbx: true, h: 0.38, tint: 0.15, clips: {idle: 'Basic', walk: 'Running', run: 'Running', jump: 'Jump', sit: 'Sitting.000', sleep: 'Dead', sniff: 'Guarding', death: 'Dying.000', play: 'Jump', petting: 'Guarding'}, walkSpeed: 0.6},
+    robot: {file: 'robot.glb', h: 0.55, clips: {idle: 'Idle', walk: 'Walking', run: 'Running', jump: 'Jump', sit: 'Sitting', sleep: 'Sitting', sniff: 'Yes', death: 'Death', play: 'Dance', petting: 'Wave', happy: 'ThumbsUp'}}
+  };
+  const ONCE = new Set(['death', 'jump']); const CLAMP = new Set(['death']);
+  const PETM = {};
+  function petModel(kind) {
+    const spec = PET_MODELS[kind]; if (!spec || !MODEL_BASE) return null; const m = PETM[kind]; if (m) return m.state === 'ok' ? m : null;
+    const L = spec.fbx ? THREE.FBXLoader : THREE.GLTFLoader; if (!L || !THREE.SkeletonUtils) return null;
+    PETM[kind] = {state: 'loading'};
+    new L().load('assets/pets/' + spec.file, res => {
+      const scene = spec.fbx ? res : res.scene, clips = spec.fbx ? res.animations : res.animations;
+      (spec.hide || []).forEach(n => { const o = scene.getObjectByName(n); if (o) o.visible = false; });
+      scene.traverse(o => { if (!o.isMesh) return; o.castShadow = true; o.receiveShadow = true; o.frustumCulled = false; const ms = Array.isArray(o.material) ? o.material : [o.material]; ms.forEach(mt => { if (mt.map) mt.map.encoding = THREE.LinearEncoding; if (mt.isMeshPhongMaterial) mt.shininess = 8; mt.envMapIntensity = 0.4; if (spec.fbx) { mt.opacity = 1; mt.transparent = false; if (/fur/i.test(o.name)) { mt.alphaTest = 0.45; mt.side = THREE.DoubleSide; o.castShadow = false; } } mt.needsUpdate = true; }); });
+      scene.updateMatrixWorld(true); const bb = new THREE.Box3(); scene.traverse(o => { if (o.isMesh && o.visible) bb.expandByObject(o); });
+      PETM[kind] = {state: 'ok', scene, clips, box: bb, size: bb.getSize(new THREE.Vector3())};
+      if (R && R.pets) R.pets.forEach(P => { if (P.cfg.kind === kind) swapPetMesh(P); });
+    }, undefined, err => { PETM[kind] = {state: 'fail'}; console.warn('pet model failed', kind, err); });
+    return null;
+  }
+  const findClip = (clips, name) => clips.find(c => c.name === name) || clips.find(c => c.name.endsWith('|' + name)) || clips.find(c => c.name.toLowerCase().includes(String(name).toLowerCase()));
+  function animPetMesh(cfg) {
+    const spec = PET_MODELS[cfg.kind], src = petModel(cfg.kind); if (!src) return null;
+    const root = new THREE.Group(), body = new THREE.Group(); root.add(body);
+    const inst = THREE.SkeletonUtils.clone(src.scene); const c = src.box.getCenter(new THREE.Vector3()); const s = spec.h / src.size.y;
+    const wrap = new THREE.Group(); wrap.scale.setScalar(s); inst.position.set(-c.x, -src.box.min.y, -c.z); wrap.add(inst); body.add(wrap);
+    if (spec.tint) { const col = new THREE.Color('#ffffff').lerp(new THREE.Color(cfg.color), spec.tint); inst.traverse(o => { if (!o.isMesh) return; o.material = Array.isArray(o.material) ? o.material.map(mt => { const n = mt.clone(); n.color.multiply(col); return n; }) : (() => { const n = o.material.clone(); n.color.multiply(col); return n; })(); }); }
+    const mixer = new THREE.AnimationMixer(inst), acts = {};
+    const act = key => { const nm = spec.clips[key]; if (!nm) return null; if (acts[key] !== undefined) return acts[key]; const clip = findClip(src.clips, nm); const a = clip ? mixer.clipAction(clip) : null; if (a && (ONCE.has(key) || (cfg.kind === 'robot' && key === 'sit'))) { a.setLoop(THREE.LoopOnce); a.clampWhenFinished = CLAMP.has(key) || key === 'sit'; } acts[key] = a; return a; };
+    const dummy = () => new THREE.Group();
+    const m = {root, body, head: dummy(), tail: null, legs: [], ears: [], eyes: [], anim: {mixer, act, cur: null, key: null, spec}};
+    return m;
+  }
+  // choose a clip for what the pet is doing and cross-fade to it
+  function playPet(P, key, now) {
+    const A = P.m.anim; if (!A) return; let a = A.act(key); if (!a && key !== 'idle') { key = 'idle'; a = A.act('idle'); } if (!a || A.key === key) return;
+    a.reset(); a.enabled = true; a.setEffectiveWeight(1); a.setEffectiveTimeScale(key === 'walk' && A.spec.walkSpeed ? A.spec.walkSpeed : 1); a.play();
+    if (A.cur) A.cur.crossFadeTo(a, key === 'death' ? 0.2 : 0.3, false); A.cur = a; A.key = key;
+  }
+  function petClipFor(P, now) {
+    if (P.deadT) return 'death';
+    if (P.trickT0) return 'jump';
+    if (P.state === 'walk') return 'walk';
+    if (P.state === 'inter' && P.inter) { const t = P.inter.type; if (t === 'chase') return 'run'; if (P.moving) return 'walk'; return t === 'dance' || t === 'bounce' ? (P.cfg.kind === 'robot' ? 'play' : 'jump') : 'sniff'; }
+    if (P.state === 'sleep') return 'sleep';
+    if (P.state === 'sit') return 'sit';
+    if (P.state === 'happy') return P.cfg.kind === 'robot' ? 'happy' : 'jump';
+    if (P.state === 'play') return 'play';
+    if (P.state === 'petting') return 'petting';
+    return (Math.floor(now / 7000 + P.x * 3) % 3 === 0 && P.m.anim.spec.clips.idle2) ? 'idle2' : 'idle';
+  }
+  function swapPetMesh(P) {
+    const i = R.pets.indexOf(P); if (i < 0) return; const m = animPetMesh(P.cfg); if (!m) return;
+    R.petsG.remove(P.m.root); m.root.userData.pet = i; m.root.traverse(o => o.userData.pet = i); R.petsG.add(m.root); P.m = m;
   }
   function rebuildPets() {
     if (!R) return; clearGroup(R.petsG); R.pets = []; R.pairs = {};
@@ -1702,6 +1761,12 @@ const Room = (() => {
       else if (!P.deadT) { m.body.position.set(0, 0, 0); }
       let roll = 0; if (P.deadT) { const e = now - P.deadT; const ki = Math.min(1, e / 420), inK = ki < 1 ? 1 - Math.pow(1 - ki, 3) + Math.sin(ki * Math.PI) * 0.12 : 1, ko = e > 3000 ? Math.min(1, (e - 3000) / 400) : 0, outK = ko * ko * (3 - 2 * ko); roll = (Math.PI / 2) * (inK - outK); m.body.position.set(0, 0, 0); m.body.rotation.x = 0; m.head.rotation.x = 0; m.eyes.forEach(ey => ey.scale.y = outK > 0 ? 1 : 0.12); m.legs.forEach(l => l.rotation.x = 0); if (e > 3400) { P.deadT = 0; P.trickT0 = now; for (let j = 0; j < 5; j++) setTimeout(() => spawnFx('heart', P.x, 0.7, P.z), j * 90); $('#roomCaption').textContent = `${P.cfg.name} springs back up!`; if (CFG.sound) petSound(P.cfg.kind); } }
       let spin = 0; if (P.trickT0) { const k = (now - P.trickT0) / 1200; if (k < 1) { y += Math.sin(k * Math.PI) * 0.55; spin = k * Math.PI * 2; if (P.cfg.kind === 'otter') m.body.rotation.z = k * Math.PI * 2; if (P.cfg.kind === 'bunny') m.body.rotation.x = -Math.sin(k * Math.PI) * 0.6; } else { P.trickT0 = 0; m.body.rotation.z = 0; } }
+      if (m.anim) {
+        // real skeletal animation does the moving; the procedural layer only keeps the stand-up lean and the trick arc
+        playPet(P, petClipFor(P, now), now); m.anim.mixer.update(dt * (P.state === 'walk' ? Math.min(1.6, 0.7 + sp) : 1));
+        if (!(P.stand && !P.deadT)) { m.body.rotation.set(0, 0, 0); m.body.position.set(0, 0, 0); } m.body.scale.set(1, 1, 1);
+        y = P.trickT0 ? Math.sin(Math.min(1, (now - P.trickT0) / 1200) * Math.PI) * 0.35 : 0; roll = 0;
+      }
       m.root.position.set(P.x, y + (roll && m.deadLift ? m.deadLift(Math.abs(roll)) : 0), P.z); m.root.rotation.set(0, P.heading + spin, roll);
     });
     separatePets(); meetPets(now);
@@ -1967,6 +2032,7 @@ const Room = (() => {
     thermoRedraw() { drawThermo(); },
     thermoScreen(px, py, part) { if (!R || !R.thermo) return null; const v = part === 'ring' ? new THREE.Vector3(-4.4 + px * 0.2, 2.5, -3.9) : new THREE.Vector3(-4.4 + (px / 512 * 2 - 1) * 0.18, 2.5 - (py / 512 * 2 - 1) * 0.18, -3.925); v.project(R.camera); const r = R.renderer.domElement.getBoundingClientRect(); return {x: r.left + (v.x + 1) / 2 * r.width, y: r.top + (1 - v.y) / 2 * r.height}; },
     petPlace(i, x, z) { const P = R && R.pets[i]; if (P) { P.x = x; P.z = z; P.tx = x; P.tz = z; P.state = 'idle'; P.until = performance.now() + 4000; } },
+    petDebug() { return (R && R.pets || []).map(P => { const b = new THREE.Box3().setFromObject(P.m.root); const k = P.cfg.kind; return {k, anim: !!P.m.anim, src: PETM[k] && PETM[k].size ? PETM[k].size.toArray().map(v => +v.toFixed(3)) : PETM[k] && PETM[k].state, world: b.getSize(new THREE.Vector3()).toArray().map(v => +v.toFixed(3)), clips: PETM[k] && PETM[k].clips ? PETM[k].clips.map(c => c.name).slice(0, 12) : null}; }); },
     petsInfo() { return R && R.pets ? R.pets.map(P => ({k: P.cfg.kind, x: +P.x.toFixed(2), z: +P.z.toFixed(2), s: P.state, t: P.inter ? P.inter.type : ''})) : []; },
     petScreen(i) { if (!R || !R.pets[i]) return null; const P = R.pets[i]; const v = new THREE.Vector3(P.x, 0.3, P.z).project(R.camera); const r = R.renderer.domElement.getBoundingClientRect(); return {x: r.left + (v.x + 1) / 2 * r.width, y: r.top + (1 - v.y) / 2 * r.height}; },
     rubInput(x, isHand) { if (R) rubInput(x, isHand); },
@@ -2355,7 +2421,7 @@ if (window.STUDIO_HOSTED) $('#importLbl').hidden = false;
   let peek = null;
   document.addEventListener('pointermove', e => { const a = e.target && e.target.closest ? e.target.closest('.room-bottom .stations a') : null; if (a === peek) return; if (peek) peek.classList.remove('peek'); peek = a; if (a) a.classList.add('peek'); });
 })();
-window.StudioHooks = {thermoDial: () => Room.thermoDial(), thermoTwist: d => Room.thermoTwist(d), thermoGrip: on => Room.thermoGrip(on), isThermo: () => Room.isThermo(), thermoOver: (x, y) => Room.thermoOver(x, y), thermoScreen: (a, b, c) => Room.thermoScreen(a, b, c), petsInfo: () => Room.petsInfo(), _petPlace: (i, x, z) => Room.petPlace(i, x, z), look: (dx, dy) => Room.look(dx, dy), zoom: f => Room.zoom(f), isPetting: () => Room.isPetting(), rubInput: (x, h) => Room.rubInput(x, h), stopPetting: () => Room.stopPetting(), stand: on => Room.stand(on), playDead: () => Room.playDead(), overPet: (x, y) => Room.overPet(x, y), trick: () => Room.trick(), petScreen: i => Room.petScreen(i || 0), notice, stations: STATIONS};
+window.StudioHooks = {_petDebug: () => Room.petDebug(), thermoDial: () => Room.thermoDial(), thermoTwist: d => Room.thermoTwist(d), thermoGrip: on => Room.thermoGrip(on), isThermo: () => Room.isThermo(), thermoOver: (x, y) => Room.thermoOver(x, y), thermoScreen: (a, b, c) => Room.thermoScreen(a, b, c), petsInfo: () => Room.petsInfo(), _petPlace: (i, x, z) => Room.petPlace(i, x, z), look: (dx, dy) => Room.look(dx, dy), zoom: f => Room.zoom(f), isPetting: () => Room.isPetting(), rubInput: (x, h) => Room.rubInput(x, h), stopPetting: () => Room.stopPetting(), stand: on => Room.stand(on), playDead: () => Room.playDead(), overPet: (x, y) => Room.overPet(x, y), trick: () => Room.trick(), petScreen: i => Room.petScreen(i || 0), notice, stations: STATIONS};
 /* ---------- boot ---------- */
 async function migrate() {
   const local = S.localItems.filter(x => !store.items.find(y => y.id === x.id));
