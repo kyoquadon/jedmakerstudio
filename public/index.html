@@ -36,6 +36,7 @@
     <a href="#wall" data-st="wall" aria-label="Sketch Wall"><img src="assets/icons/light_bulb.webp" alt=""><span class="lbl-t">Sketch Wall</span></a>
     <a href="#gallery" data-st="gallery" aria-label="Gallery"><img src="assets/icons/framed_picture.webp" alt=""><span class="lbl-t">Gallery</span></a>
     <a href="#mirror" data-st="mirror" aria-label="Voice Mirror"><img src="assets/icons/crystal_ball.webp" alt=""><span class="lbl-t">Voice Mirror</span></a>
+    <a href="#portfolio" data-st="portfolio" aria-label="Portfolio Wall"><img src="assets/icons/bookmark_tabs.webp" alt=""><span class="lbl-t">Portfolio Wall</span></a>
     <a href="#thermostat" data-st="thermostat" aria-label="Thermostat"><img src="assets/icons/thermometer.webp" alt=""><span class="lbl-t">Thermostat</span></a>
   </nav>
     <button id="dockToggle" class="dock-btn" type="button" aria-expanded="true" aria-label="Hide the station bar"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1d2030" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
@@ -372,6 +373,13 @@
     </section>
 
     <!-- MIRROR -->
+    <section class="station" data-name="portfolio" aria-labelledby="h-portfolio" hidden>
+      <div class="sheet pad">
+        <div class="sec-head"><div><h2 id="h-portfolio">Portfolio Wall</h2><p class="hint">Your creative and AI work on claude.ai. Each card opens in a new tab. The links open for you; other people only see the ones you've shared.</p></div></div>
+        <div id="workFilters" class="row" role="group" aria-label="Filter the portfolio"></div>
+        <div id="workList" class="work-list"></div>
+      </div>
+    </section>
     <section class="station" data-name="mirror" aria-labelledby="h-mirror" hidden>
       <div class="grid-2">
         <div class="sheet pad">
@@ -403,7 +411,7 @@
       </div>
     </section>
   </main>
-  <footer class="foot"><p>Icons: Microsoft Fluent Emoji (MIT). Sketch lines: Rough.js (MIT). 3D: three.js (MIT). Your studio is private to you.</p><div class="row"><button id="exportBtn" class="btn btn-sm" type="button">Export my studio</button><button id="exToggle" class="btn btn-sm" type="button">Hide examples</button><label id="importLbl" class="btn btn-sm" for="importFile" hidden>Import a studio file</label><input type="file" id="importFile" accept="application/json,.json" class="vh"></div></footer>
+  <footer class="foot"><p>Icons: Microsoft Fluent Emoji (MIT). Sketch lines: Rough.js (MIT). 3D: three.js (MIT), furniture and props from Poly Haven (CC0). Your studio is private to you.</p><div class="row"><button id="exportBtn" class="btn btn-sm" type="button">Export my studio</button><button id="exToggle" class="btn btn-sm" type="button">Hide examples</button><label id="importLbl" class="btn btn-sm" for="importFile" hidden>Import a studio file</label><input type="file" id="importFile" accept="application/json,.json" class="vh"></div></footer>
   </div>
 </div>
 
@@ -411,6 +419,9 @@
 <script src="js/claude-shim.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/roughjs@4.6.6/bundled/rough.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/environments/RoomEnvironment.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/geometries/RoundedBoxGeometry.js"></script>
 <script src="js/app.js"></script>
 <script src="js/gestures.js"></script>
 </body>

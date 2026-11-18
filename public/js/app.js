@@ -1030,8 +1030,8 @@ async function runCrit() {
 }
 
 /* ---------- the room (diegetic 3D hub) ---------- */
-const SNAME = {workbench: 'Workbench', pinboard: 'Pinboard', corner: 'Conversation Corner', machine: 'Idea Machine', playground: 'Playground', wall: 'Sketch Wall', gallery: 'Gallery and Compost Heap', mirror: 'Voice Mirror', thermostat: 'Room thermostat'};
-const SDESC = {workbench: 'the desk under the window, where your journal lives.', pinboard: 'the cork board. Pin what moves you.', corner: 'seats and a rug. Pull one up and talk it through.', machine: 'feed it scraps and pull the lever.', playground: 'the slide and ball pit. Ten-minute warm-ups live here.', wall: 'the sketch board. Map your thinking in 2D or 3D.', gallery: 'frames on the wall for finished pieces, and the compost crate below.', mirror: 'the standing mirror shows the fingerprint of your voice.', thermostat: 'change the look of everything, the weather outside and the light inside.'};
+const SNAME = {portfolio: 'Portfolio Wall', workbench: 'Workbench', pinboard: 'Pinboard', corner: 'Conversation Corner', machine: 'Idea Machine', playground: 'Playground', wall: 'Sketch Wall', gallery: 'Gallery and Compost Heap', mirror: 'Voice Mirror', thermostat: 'Room thermostat'};
+const SDESC = {portfolio: 'your creative and AI work, one tap from the room.', workbench: 'the desk under the window, where your journal lives.', pinboard: 'the cork board. Pin what moves you.', corner: 'seats and a rug. Pull one up and talk it through.', machine: 'feed it scraps and pull the lever.', playground: 'the slide and ball pit. Ten-minute warm-ups live here.', wall: 'the sketch board. Map your thinking in 2D or 3D.', gallery: 'frames on the wall for finished pieces, and the compost crate below.', mirror: 'the standing mirror shows the fingerprint of your voice.', thermostat: 'change the look of everything, the weather outside and the light inside.'};
 const PART_KEYS = ['walls','floor','winframe','desk','lamp','stool','pinboard','machine','mirror','board','frames','crate','rug','trim','table','seat1','seat2','slide','ladder','pit','bed'];
 const PART_TYPES = {walls: ['pegboard','brick','plaster','wood panels'], floor: ['planks','tiles','carpet','concrete'], desk: ['wood','drafting','standing'], lamp: ['desk lamp','globe','candle'], machine: ['gumball','robot','arcade'], mirror: ['oval','round','arched'], board: ['chalkboard','whiteboard','easel'], rug: ['round','square','star'], seat1: ['stool','beanbag','armchair'], seat2: ['stool','beanbag','armchair']};
 const PART_LABEL = {walls: 'Walls', floor: 'Floor', winframe: 'Window frames', desk: 'Desk', lamp: 'Lamp', stool: 'Desk stool', pinboard: 'Pinboard frame', machine: 'Idea Machine', mirror: 'Mirror', board: 'Sketch board', frames: 'Picture frames', crate: 'Compost crate', rug: 'Rug', trim: 'Rug trim', table: 'Corner table', seat1: 'Seat one', seat2: 'Seat two', slide: 'Slide', ladder: 'Slide ladder', pit: 'Ball pit', bed: 'Pet bed'};
@@ -1060,6 +1060,55 @@ function mergeRoomCfg(saved) {
   return out;
 }
 
+/* ---------- portfolio wall: links to Jed's creative and AI artifacts on claude.ai ---------- */
+const WORKS = [
+  ['games', 'Games and worlds', '#2f5bea', [
+    ['Off the Hook Hub', '1WLXTYtDNpzHW7phqA33cT', 'Home base for the fishing game.'],
+    ['Off the Hook Four Seas', 'SBuqdDudjqbFKqLf3Z4guN', 'Storyboard of four world versions, casts and endings.'],
+    ['Off the Hook Story Map', 'DEBBS2oU4j8gshWWyuFhvq', 'The story laid out as a map.'],
+    ['Off the Hook Arc', 'UqndUn1xXzsQmz1mH57Ksk', 'The narrative arc.'],
+    ['Off the Hook Pitch', '5ercRE9j3RTWSEujNBNPnq', 'The pitch for the game.'],
+    ["Off the Hook: The God's Island", 'HN5De2FEphA5wkGRRGe9XD', 'Design doc for the island.'],
+    ['Pipes Direction Board', 'K4Y85PcwVf8Rubwu6f8odi', 'Directions, chronology, story and level mechanics.'],
+    ['Tapping on the Pipes: Design Bible', '3EDEjQuJi4hUWU9A3Af6F3', 'Mouse Edition design bible.'],
+    ['Odd Ocean Slice Options', 'RstHPVHNQWxER9viPHq3H3', 'Options for a vertical slice.'],
+    ['Loss and Found Audio Desk', 'NvjWmLwtHjL4PspccKc1a4', 'Sound editor and mixer with WAV exports for Godot.'],
+    ['Tidewell Scenario Card: The Hairline Crack', '9ofkQgKyq67t7wxDxQB3bK', 'A scenario card design.']]],
+  ['studio', 'Studio and portfolio', '#ff8fc8', [
+    ["Jed's Maker's Studio", 'FwPZtYECiRjrinzr7PJf7M', 'The original studio with its stations.'],
+    ["Maker's Studio Room", 'KVUbh6VXGfWQUY1bjWdJAW', 'This room, the claude.ai version.'],
+    ['Jedidiah Siah Portfolio', '6bgEYBTw6VEWaeD4CjQPqP', 'Game design portfolio with four case studies.'],
+    ['Jedidiah Siah, Human Club', 'CJkHRguBchrS6ZTTifD7Yv', 'Card-table story of serious game and gamification work.'],
+    ['Jed, Player One', 'PSZx4tTLyfkkXxHBv5tEEn', 'Animated player-select intro for workshops.'],
+    ["Cameron's Gallery", 'SBBxDSH8NuqdUs6MVRFAXV', 'A gallery.']]],
+  ['client', 'Game design for clients', '#ffc83a', [
+    ['GovTech Game Hub', '2gz2PtNFZUmcEUYrcGTbvT', 'Hub for the GovTech culture and values game.'],
+    ['Ground Truth', '7vZSqe7Dupef2YHYss4GgB', 'Scroll story pitching the game as a night-to-dawn survey.'],
+    ['GovTech Culture Game Proposal', '4qK5m9gYLcDXcdtmwKv4Wz', 'The proposal deck.']]],
+  ['ai', 'AI work', '#1fae7a', [
+    ['AI Hub', 'X6YTBY2xnLYM36ioHXA7Kc', 'Learning and teaching hub for AI.'],
+    ['Teaching Studio', '9NnHMvot1bgHjnUXVptfCr', 'Turning what you learn into lessons.'],
+    ['Agent Roster', '1dDxTyAEMbmoQbB1NVz3RP', 'The agent teams under Anubis, with roles and tiers.'],
+    ['Agent Standards 2026', 'Jtoc2mP1sWpFH4sFaLBAqL', 'Standards doc for the agents.'],
+    ['Second Brain graph', 'Xv2TsesUR5NJTvxvoLFyBs', 'Graph view of the second brain.'],
+    ['Second Brain Map', 'EQaSWebnLLPF29FudyVCWN', 'Map of the second brain.'],
+    ['Tool shelf', 'DsRAUiFLwrDTPoNeD9GYro', 'Shelf of tools.'],
+    ['Jed Command Centre', 'DBpKVbR84DzR47NZwiBFuz', 'Command centre dashboard.'],
+    ['Bespoke AI Tools Pitch Deck', '35Ku4MKDaXM5r8opSixgm3', 'Fifteen-slide pitch for bespoke AI tools.'],
+    ['The Window Pitch', '3jSZfcXVEHPTMZNZghGQHy', 'Scroll-driven pitch story with two laptop demos.'],
+    ['Filos Front Door (demo)', 'UVFfaV1zeqtRtv8rEUE7HY', 'Referral drafting demo for Filos.'],
+    ['Filos Front Door (film)', 'NAKWLVbh5xw4ncE1bb6uos', 'Film for the Filos pitch.'],
+    ['Filos Safety Walkthrough', '9ofKm4JoEUWpqnL4EKXumi', 'Safety walkthrough for Filos.'],
+    ['Pain Point Atlas', 'MpRHLyWyMhTGEnXhHvUyRd', 'Map of sourced pain points for small organisations.'],
+    ['Logic Model Studio', 'J6xkrWRyZAQkc9F8vhJAA5', 'Logic model building tool.']]]
+];
+const workUrl = id => 'https://claude.ai/artifact/' + id;
+function renderPortfolio() {
+  const f = S.workFilter || 'all';
+  $('#workFilters').innerHTML = [['all', 'Everything']].concat(WORKS.map(g => [g[0], g[1]])).map(([k, n]) => `<button class="btn btn-sm ${f === k ? 'btn-blue' : ''}" type="button" data-wf="${k}" aria-pressed="${f === k}">${esc(n)}</button>`).join('');
+  $('#workList').innerHTML = WORKS.filter(g => f === 'all' || g[0] === f).map(([k, name, col, items]) => `<section class="work-group"><h3><span class="sw" style="background:${col}"></span>${esc(name)} <span class="hint">${items.length}</span></h3><div class="work-grid">${items.map(([t, id, d]) => `<a class="work-card" style="--wc:${col}" href="${workUrl(id)}" target="_blank" rel="noopener"><b>${esc(t)}</b><span>${esc(d)}</span><span class="work-open">Open <span aria-hidden="true">↗</span></span></a>`).join('')}</div></section>`).join('');
+}
+window.WORKS = WORKS;
 const Room = (() => {
   let R = null; let CFG = defaultRoomCfg();
   const V = {
@@ -1072,9 +1121,10 @@ const Room = (() => {
     gallery: {pos: [-0.5, 2.0, 0.6], tgt: [-5, 1.6, 0.3]},
     corner: {pos: [2.0, 2.8, 5.6], tgt: [2.0, 0.6, 1.8]},
     playground: {pos: [-0.6, 2.6, 5.8], tgt: [-2.6, 0.5, 2.4]},
-    thermostat: {pos: [-4.4, 2.5, -3.2], tgt: [-4.4, 2.5, -3.96]}
+    thermostat: {pos: [-4.4, 2.5, -3.2], tgt: [-4.4, 2.5, -3.96]},
+    portfolio: {pos: [-3.15, 2.4, 3.0], tgt: [-5, 2.4, 3.0]}
   };
-  const SPOT = {workbench: [-2.6, -1.6], pinboard: [0, -2.5], machine: [1.9, -2.2], mirror: [3.1, -1.8], wall: [3.7, -0.4], gallery: [-3.8, -0.2], corner: [0.6, 2.4], playground: [-1.2, 1.4], thermostat: [-3.9, -1.6]};
+  const SPOT = {portfolio: [-3.3, 1.2], workbench: [-2.6, -1.6], pinboard: [0, -2.5], machine: [1.9, -2.2], mirror: [3.1, -1.8], wall: [3.7, -0.4], gallery: [-3.8, -0.2], corner: [0.6, 2.4], playground: [-1.2, 1.4], thermostat: [-3.9, -1.6]};
   const WINS = [
     {p: [-3, 2.75, -3.97], ry: 0, w: 1.7, h: 1.15},
     {p: [4.97, 2.35, 2.4], ry: -Math.PI / 2, w: 1.5, h: 1.15},
@@ -1088,7 +1138,7 @@ const Room = (() => {
   const weather = () => CFG.weather === 'auto' ? autoWeather : CFG.weather;
 
   /* helpers */
-  function mat(color, o) { return new THREE.MeshStandardMaterial(Object.assign({color, roughness: 0.78, flatShading: true}, o || {})); }
+  function mat(color, o) { return new THREE.MeshStandardMaterial(Object.assign({color, roughness: 0.72, metalness: 0.02, envMapIntensity: 0.22}, o || {}, {flatShading: false})); }
   function M(key, o) { const m = mat(CFG.parts[key].color, o); m.userData.part = key; return m; }
   const pm = (k, o) => (typeof k === 'string' && CFG.parts[k]) ? M(k, o) : mat(k, o);
   const INK = {}; 
@@ -1102,13 +1152,13 @@ const Room = (() => {
   // one LineSegments per group for every static box edge: far fewer draw calls than a line object per box
   function mergeEdges(g) {
     if (!INK.line) return; g.updateMatrixWorld(true); const inv = new THREE.Matrix4().copy(g.matrixWorld).invert(); const m4 = new THREE.Matrix4(), v = new THREE.Vector3(); const arrs = []; let n = 0;
-    g.traverse(o => { if (o.isMesh && o.userData.wantEdges) { const eg = new THREE.EdgesGeometry(o.geometry, 25); const pos = eg.attributes.position; m4.multiplyMatrices(inv, o.matrixWorld); const out = new Float32Array(pos.count * 3); for (let i = 0; i < pos.count; i++) { v.fromBufferAttribute(pos, i).applyMatrix4(m4); out[i * 3] = v.x; out[i * 3 + 1] = v.y; out[i * 3 + 2] = v.z; } arrs.push(out); n += out.length; eg.dispose(); } });
+    g.traverse(o => { if (o.isMesh && o.userData.wantEdges) { const es = o.geometry.userData && o.geometry.userData.edgeSrc; const eg = new THREE.EdgesGeometry(es ? new THREE.BoxGeometry(...es) : o.geometry, 25); const pos = eg.attributes.position; m4.multiplyMatrices(inv, o.matrixWorld); const out = new Float32Array(pos.count * 3); for (let i = 0; i < pos.count; i++) { v.fromBufferAttribute(pos, i).applyMatrix4(m4); out[i * 3] = v.x; out[i * 3 + 1] = v.y; out[i * 3 + 2] = v.z; } arrs.push(out); n += out.length; eg.dispose(); } });
     if (!n) return; const all = new Float32Array(n); let off = 0; arrs.forEach(a => { all.set(a, off); off += a.length; });
     const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(all, 3)); const ls = new THREE.LineSegments(geo, INK.line); ls.raycast = () => {}; g.add(ls);
   }
-  function box(w, h, d, k, x, y, z, parent, o) { return add(new THREE.Mesh(new THREE.BoxGeometry(w, h, d), pm(k, o)), parent, x, y, z); }
-  function cyl(rt, rb, h, k, x, y, z, parent, seg, o) { return add(new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, seg || 16), pm(k, o)), parent, x, y, z); }
-  function sph(r, k, x, y, z, parent, o) { return add(new THREE.Mesh(new THREE.SphereGeometry(r, 16, 12), pm(k, o)), parent, x, y, z); }
+  function box(w, h, d, k, x, y, z, parent, o) { const mn = Math.min(w, h, d); let geo; if (THREE.RoundedBoxGeometry && mn > 0.035 && !R.petBuild) { geo = new THREE.RoundedBoxGeometry(w, h, d, 2, Math.min(0.025, mn * 0.18)); geo.userData = {edgeSrc: [w, h, d]}; } else geo = new THREE.BoxGeometry(w, h, d); return add(new THREE.Mesh(geo, pm(k, o)), parent, x, y, z); }
+  function cyl(rt, rb, h, k, x, y, z, parent, seg, o) { return add(new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, Math.max(seg || 28, 12)), pm(k, o)), parent, x, y, z); }
+  function sph(r, k, x, y, z, parent, o) { return add(new THREE.Mesh(new THREE.SphereGeometry(r, 28, 20), pm(k, o)), parent, x, y, z); }
   function ctex(w, h, draw) { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h, c); const t = new THREE.CanvasTexture(c); t.anisotropy = 4; return t; }
   function setMap(mesh, t) { const old = mesh.material.map; mesh.material.map = t; mesh.material.needsUpdate = true; if (old) old.dispose(); }
   function wrapText(x, text, maxW) { const ws = String(text || '').split(/\s+/); const lines = []; let line = ''; for (const w of ws) { const t = line ? line + ' ' + w : w; if (x.measureText(t).width > maxW && line) { lines.push(line); line = w; } else line = t; } if (line) lines.push(line); return lines; }
@@ -1169,11 +1219,38 @@ const Room = (() => {
     if (CFG.mood === 'bright') { h *= 1.4; s *= 1.1; lamp = 0.7; fill = 1.0; }
     if (CFG.mood === 'neon') { h *= 0.45; s *= 0.35; lamp = 0.8; fill = 0.15; neon = 1.6; }
     if (CFG.mood === 'moody') { h *= 0.45; s *= 0.5; lamp = 1.7; fill = 0.1; }
-    R.hemi.intensity = h * b; R.baseSun = s * b; R.sun.intensity = R.baseSun; R.sun.color.setHex(we === 'rain' || we === 'thunderstorm' ? 0x9fb3d6 : we === 'snow' ? 0xdfe8ff : base.sc);
+    R.hemi.intensity = h * b * (R.scene.environment ? 0.55 : 1); R.baseSun = s * b; R.sun.intensity = R.baseSun; R.sun.color.setHex(we === 'rain' || we === 'thunderstorm' ? 0x9fb3d6 : we === 'snow' ? 0xdfe8ff : base.sc);
     R.lamp.intensity = lamp * b; R.lamp.color.set(CFG.lampColor); R.baseLamp = R.lamp.intensity; R.fill.intensity = fill * b; R.neon1.intensity = R.neon2.intensity = neon * b; R.neon1.visible = R.neon2.visible = neon > 0;
     const bg = new THREE.Color(CFG.mood === 'neon' ? '#140f22' : base.bg); R.scene.background = bg; R.scene.fog.color = bg;
     if (R.shadeMat) R.shadeMat.emissive = new THREE.Color(CFG.lampColor).multiplyScalar(ph === 'day' && CFG.mood !== 'moody' ? 0.15 : 0.45);
     drawThermo();
+  }
+
+  /* ---------- real 3D models (CC0, Poly Haven) with procedural fallback ---------- */
+  const MODELS = {table: 'wooden_table_02', armlamp: 'desk_lamp_arm_01', stool: 'wooden_stool_01', plant: 'potted_plant_02', pens: 'stationery_supplies', spray: 'spray_paint_bottles', shelf: 'wooden_display_shelves_01', books: 'book_encyclopedia_set_01', radio: 'cassette_player', vase: 'ceramic_vase_01', chair: 'ArmChair_01', duck: 'rubber_duck_toy', ball: 'baseball_01'};
+  const MDL = {}; let mdlT = 0;
+  const MODEL_BASE = window.STUDIO_HOSTED ? 'assets/models/' : null; // the single-file claude.ai version keeps the hand-built pieces
+  function model(key) {
+    const id = MODELS[key]; const m = MDL[id]; if (m) return m.state === 'ok' ? m : null;
+    if (!MODEL_BASE || !THREE.GLTFLoader) return null;
+    MDL[id] = {state: 'loading'};
+    new THREE.GLTFLoader().load(`${MODEL_BASE}${id}/${id}_1k.gltf`, gl => {
+      const sc = gl.scene; sc.traverse(o => { if (!o.isMesh) return; o.castShadow = true; o.receiveShadow = true; const ms = Array.isArray(o.material) ? o.material : [o.material];
+        ms.forEach(mt => { ['map', 'emissiveMap'].forEach(k => { if (mt[k]) { mt[k].encoding = THREE.LinearEncoding; mt[k].anisotropy = 4; mt[k].needsUpdate = true; } }); mt.envMapIntensity = 0.4; mt.needsUpdate = true; }); });
+      const bb = new THREE.Box3().setFromObject(sc); MDL[id] = {state: 'ok', scene: sc, box: bb, size: bb.getSize(new THREE.Vector3())};
+      clearTimeout(mdlT); mdlT = setTimeout(() => { if (R) rebuildAll(); }, 250);
+    }, undefined, () => { MDL[id] = {state: 'fail'}; });
+    return null;
+  }
+  // place a model so its footprint is centred on (x, z) and its base sits at y; fit by height (uniform) or to an exact size [w, h, d]
+  function place(key, parent, o) {
+    const m = model(key); if (!m) return null;
+    const inner = m.scene.clone(true), c = m.box.getCenter(new THREE.Vector3()); inner.position.set(-c.x, -m.box.min.y, -c.z);
+    const w = new THREE.Group(); w.add(inner);
+    if (o.size) w.scale.set(o.size[0] / m.size.x, o.size[1] / m.size.y, o.size[2] / m.size.z); else { const s = o.h / m.size.y; w.scale.set(s, s, s); }
+    w.position.set(o.x, o.y || 0, o.z); w.rotation.y = o.ry || 0;
+    if (o.tint) { const col = new THREE.Color('#ffffff').lerp(new THREE.Color(CFG.parts[o.tint].color), 0.3); inner.traverse(n => { if (n.isMesh) { n.material = n.material.clone(); n.material.color.copy(col); n.material.userData.tintPart = o.tint; } }); }
+    parent.add(w); return w;
   }
 
   /* builders */
@@ -1184,6 +1261,12 @@ const Room = (() => {
     const wt = CFG.parts.walls.type; const rep = {pegboard: 1.6, brick: 1.1, plaster: 0.5, 'wood panels': 1.2}[wt] || 1;
     const wall = (w, ry, px, pz) => { const t = wallTex(wt); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(w * rep, 4.2 * rep); const m = new THREE.Mesh(new THREE.PlaneGeometry(w, 4.2), M('walls', {map: t, flatShading: false})); m.rotation.y = ry; m.position.set(px, 2.1, pz); m.receiveShadow = true; sh.add(m); };
     wall(10, 0, 0, -4); wall(8, Math.PI / 2, -5, 0); wall(8, -Math.PI / 2, 5, 0);
+    if (!R.aoTex) R.aoTex = ctex(8, 128, (x, w, h) => { const g = x.createLinearGradient(0, 0, 0, h); g.addColorStop(0, 'rgba(0,0,0,0.55)'); g.addColorStop(0.35, 'rgba(0,0,0,0.18)'); g.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = g; x.fillRect(0, 0, w, h); });
+    const aoM = new THREE.MeshBasicMaterial({map: R.aoTex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2});
+    const ao = (w, hgt, px, py, pz, rx, ry, rz) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, hgt), aoM); m.position.set(px, py, pz); m.rotation.set(rx, ry, rz); m.renderOrder = 1; m.raycast = () => {}; sh.add(m); };
+    ao(10, 0.7, 0, 0.004, -3.65, -Math.PI / 2, 0, 0); ao(8, 0.7, -4.65, 0.004, 0, -Math.PI / 2, 0, Math.PI / 2); ao(8, 0.7, 4.65, 0.004, 0, -Math.PI / 2, 0, -Math.PI / 2);   // floor along each wall
+    ao(10, 0.9, 0, 0.45, -3.985, 0, 0, Math.PI); ao(8, 0.9, -4.985, 0.45, 0, 0, Math.PI / 2, Math.PI); ao(8, 0.9, 4.985, 0.45, 0, 0, -Math.PI / 2, Math.PI); // wall bottoms
+    ao(4.2, 0.6, -4.7, 2.1, -3.985, 0, 0, Math.PI / 2); ao(4.2, 0.6, 4.7, 2.1, -3.985, 0, 0, -Math.PI / 2); ao(4.2, 0.6, -4.985, 2.1, -3.7, 0, Math.PI / 2, -Math.PI / 2); ao(4.2, 0.6, 4.985, 2.1, -3.7, 0, -Math.PI / 2, Math.PI / 2); // back corners
     box(10, 0.16, 0.06, '#1d2030', 0, 0.08, -3.97, sh); box(0.06, 0.16, 8, '#1d2030', -4.97, 0.08, 0, sh); box(0.06, 0.16, 8, '#1d2030', 4.97, 0.08, 0, sh);
     WINS.slice(0, Math.max(1, Math.min(4, CFG.windows.count))).forEach(W => {
       const st = CFG.windows.style === 'arched' && W.w / W.h > 1.8 ? 'square' : CFG.windows.style;
@@ -1252,6 +1335,26 @@ const Room = (() => {
   function thermoTurn(dir) { if (!R || !R.thermoRing) return; R.thermoTurn = (R.thermoTurn || 0) - dir * Math.PI / 12; R.thermoSpin = {from: R.thermoRing.rotation.z, to: R.thermoTurn, t0: performance.now()}; if (CFG.sound) tick(); }
   function twist(d) { thermoTurn(d); if (window.ThermoUI) ThermoUI.turn(d); }
   function tick() { try { const ac = R.ac || (R.ac = new (window.AudioContext || window.webkitAudioContext)()); const o = ac.createOscillator(), gn = ac.createGain(); o.type = 'square'; o.frequency.value = 1800; gn.gain.setValueAtTime(0.03, ac.currentTime); gn.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + 0.04); o.connect(gn); gn.connect(ac.destination); o.start(); o.stop(ac.currentTime + 0.05); } catch (e) {} }
+  function buildPortfolio() {
+    const g = group('portfolio'); const x0 = -4.93, cz = 3.0, cy = 2.42, W = 1.7, H = 1.25;
+    const fr = new THREE.Group(); fr.position.set(x0, cy, cz); fr.rotation.y = Math.PI / 2; g.add(fr);
+    box(W + 0.12, H + 0.12, 0.05, 'frames', 0, 0, 0, fr);
+    const works = window.WORKS || [];
+    const tex = ctex(1360, 1000, (x, w, h) => {
+      x.fillStyle = '#f6efe2'; x.fillRect(0, 0, w, h);
+      for (let i = 0; i < 1400; i++) { x.fillStyle = Math.random() < 0.5 ? 'rgba(120,90,50,.06)' : 'rgba(255,255,255,.25)'; x.fillRect(Math.random() * w, Math.random() * h, 3, 3); }
+      x.fillStyle = '#1d2030'; x.font = '800 54px Figtree, sans-serif'; x.textBaseline = 'middle'; x.fillText('Portfolio', 40, 56);
+      const cols = works.length || 1, cw = (w - 60) / cols;
+      works.forEach(([k, name, col, items], ci) => {
+        const cx = 30 + ci * cw; x.fillStyle = col; x.fillRect(cx + 8, 110, cw - 16, 50); x.fillStyle = col === '#ffc83a' || col === '#ff8fc8' ? '#1d2030' : '#fff'; x.font = '800 24px Figtree, sans-serif'; x.fillText(name, cx + 20, 136, cw - 40);
+        const rowH = Math.min(70, (h - 200) / items.length);
+        items.forEach(([t], i) => { const y = 180 + i * rowH; x.fillStyle = '#fff'; x.fillRect(cx + 8, y, cw - 16, rowH - 8); x.fillStyle = col; x.fillRect(cx + 8, y, 8, rowH - 8); x.fillStyle = '#1d2030'; x.font = `700 ${Math.min(22, rowH * 0.42)}px Figtree, sans-serif`; x.fillText(t, cx + 26, y + (rowH - 8) / 2, cw - 44); });
+      });
+    });
+    const face = new THREE.Mesh(new THREE.PlaneGeometry(W, H), new THREE.MeshStandardMaterial({map: tex, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.55, roughness: 0.9, envMapIntensity: 0.2})); face.position.z = 0.03; face.receiveShadow = true; fr.add(face);
+    // a little picture light above the board
+    const bar = cyl(0.025, 0.025, 0.6, '#1d2030', 0, H / 2 + 0.16, 0.12, fr); bar.rotation.z = Math.PI / 2;
+  }
   function buildWorkbench() {
     const g = group('workbench'); const t = CFG.parts.desk.type;
     let top = 0.92, tilt = 0;
@@ -1261,7 +1364,7 @@ const Room = (() => {
       box(0.8, 0.06, 0.9, 'desk', -2.0, top - 0.06, -3.3, g); tilt = 0.3;
       [[-0.6, -1], [0.6, 1]].forEach(([dx, s]) => { const l1 = box(0.06, 1.1, 0.06, '#1d2030', -3.3 + dx, 0.45, -3.3, g); l1.rotation.x = 0.45; const l2 = box(0.06, 1.1, 0.06, '#1d2030', -3.3 + dx, 0.45, -3.3, g); l2.rotation.x = -0.45; });
       box(0.06, top - 0.1, 0.06, '#1d2030', -1.7, (top - 0.1) / 2, -3.0, g); box(0.06, top - 0.1, 0.06, '#1d2030', -1.7, (top - 0.1) / 2, -3.6, g);
-    } else { box(2.4, 0.08, 1.05, 'desk', -3, top, -3.3, g); [[-1.1, -0.45], [1.1, -0.45], [-1.1, 0.45], [1.1, 0.45]].forEach(([dx, dz]) => box(0.08, top - 0.04, 0.08, '#1d2030', -3 + dx, (top - 0.04) / 2, -3.3 + dz, g)); }
+    } else if (!place('table', g, {x: -3, z: -3.3, size: [2.1, top + 0.04, 1.0], tint: 'desk'})) { box(2.4, 0.08, 1.05, 'desk', -3, top, -3.3, g); [[-1.1, -0.45], [1.1, -0.45], [-1.1, 0.45], [1.1, 0.45]].forEach(([dx, dz]) => box(0.08, top - 0.04, 0.08, '#1d2030', -3 + dx, (top - 0.04) / 2, -3.3 + dz, g)); }
     const flatY = t === 'drafting' ? top - 0.03 : top + 0.04;
     R.bookG = new THREE.Group(); R.bookG.position.set(t === 'drafting' ? -3.3 : -3.05, top + 0.04 + (t === 'drafting' ? 0.02 : 0), t === 'drafting' ? -3.25 : -3.15); R.bookG.rotation.x = tilt; g.add(R.bookG);
     R.book = box(1.02, 0.04, 0.66, '#2f5bea', 0, 0, 0, R.bookG);
@@ -1269,13 +1372,16 @@ const Room = (() => {
     const lx = t === 'drafting' ? -2.2 : -3.85, lz = -3.5, lt = CFG.parts.lamp.type;
     if (lt === 'globe') { cyl(0.12, 0.14, 0.04, '#1d2030', lx, flatY + 0.02, lz, g); cyl(0.015, 0.015, 0.5, '#1d2030', lx, flatY + 0.27, lz, g, 6); const gl = sph(0.14, 'lamp', lx, flatY + 0.62, lz, g, {flatShading: false, roughness: 0.3}); R.shadeMat = gl.material; R.lamp.position.set(lx, flatY + 0.62, lz + 0.2); }
     else if (lt === 'candle') { cyl(0.09, 0.11, 0.03, '#1d2030', lx, flatY + 0.015, lz, g); cyl(0.05, 0.05, 0.22, 'lamp', lx, flatY + 0.14, lz, g, 12); const fl = new THREE.Mesh(new THREE.ConeGeometry(0.025, 0.07, 8), new THREE.MeshBasicMaterial({color: 0xffd36b})); fl.position.set(lx, flatY + 0.29, lz); g.add(fl); R.flame = fl; R.shadeMat = null; R.lamp.position.set(lx, flatY + 0.4, lz + 0.15); }
+    else if (place('armlamp', g, {x: lx, y: flatY, z: lz, h: 0.62, ry: Math.PI * 0.75})) { R.shadeMat = null; R.lamp.position.set(lx + 0.18, flatY + 0.5, lz + 0.22); const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.035, 12, 10), new THREE.MeshBasicMaterial({color: 0xfff1cf})); bulb.position.copy(R.lamp.position).add(new THREE.Vector3(0, 0.02, 0)); bulb.raycast = () => {}; g.add(bulb); }
     else { cyl(0.14, 0.18, 0.05, '#1d2030', lx, flatY + 0.025, lz, g); cyl(0.025, 0.025, 0.65, '#1d2030', lx, flatY + 0.35, lz, g); const sh = cyl(0.08, 0.24, 0.24, 'lamp', lx + 0.1, flatY + 0.72, lz + 0.15, g, 20); R.shadeMat = sh.material; R.lamp.position.set(lx + 0.1, flatY + 0.62, lz + 0.2); }
     if (lt !== 'candle') R.flame = null;
     const cx = t === 'drafting' ? -1.8 : -2.0;
-    cyl(0.09, 0.07, 0.16, '#ff5b4f', cx, flatY + 0.08, -3.55, g);
-    ['#2f5bea', '#ffc83a', '#1fae7a'].forEach((c, i) => { const p = cyl(0.012, 0.012, 0.3, c, cx - 0.02 + i * 0.03, flatY + 0.24, -3.55 + (i - 1) * 0.02, g, 6); p.rotation.z = (i - 1) * 0.15; });
+    if (!place('pens', g, {x: cx - 0.05, y: flatY, z: -3.55, h: 0.17, ry: -0.3})) { cyl(0.09, 0.07, 0.16, '#ff5b4f', cx, flatY + 0.08, -3.55, g);
+    ['#2f5bea', '#ffc83a', '#1fae7a'].forEach((c, i) => { const p = cyl(0.012, 0.012, 0.3, c, cx - 0.02 + i * 0.03, flatY + 0.24, -3.55 + (i - 1) * 0.02, g, 6); p.rotation.z = (i - 1) * 0.15; }); }
+    if (t !== 'drafting') place('spray', g, {x: -2.25, y: flatY, z: -2.98, h: 0.2, ry: 0.4});
     R.plantPos = [cx - 0.35, flatY, -3.62]; cyl(0.1, 0.08, 0.14, '#c46a3c', R.plantPos[0], flatY + 0.07, R.plantPos[2], g);
-    if (t !== 'standing') box(0.5, 0.45, 0.5, 'stool', -3, 0.5, -2.4, g);
+    if (t !== 'standing' && !place('stool', g, {x: -3, z: -2.4, h: 0.62, tint: 'stool'})) box(0.5, 0.45, 0.5, 'stool', -3, 0.5, -2.4, g);
+    place('plant', g, {x: -4.5, z: -3.45, h: 0.95, ry: 0.6});
   }
   function buildPinboard() {
     const g = group('pinboard');
@@ -1354,6 +1460,8 @@ const Room = (() => {
     cyl(0.4, 0.4, 0.06, 'table', 1.7, 0.62, 1.6, g, 24); cyl(0.05, 0.05, 0.6, '#1d2030', 1.7, 0.31, 1.6, g); cyl(0.25, 0.25, 0.03, '#1d2030', 1.7, 0.02, 1.6, g);
     seat('seat1', 0.9, 1.15, g); seat('seat2', 2.5, 2.05, g);
     [[1.55, 1.5, '#ffc83a'], [1.88, 1.72, '#ff5b4f']].forEach(([x, z, c]) => cyl(0.06, 0.05, 0.1, c, x, 0.7, z, g, 12));
+    place('chair', g, {x: 3.0, z: 0.75, h: 1.0, ry: -2.1, tint: 'seat2'});
+    if (place('shelf', g, {x: 4.78, z: 2.35, h: 1.45, ry: -Math.PI / 2})) { place('books', g, {x: 4.78, y: 1.45, z: 2.33, h: 0.24, ry: -Math.PI / 2}); place('radio', g, {x: 4.8, y: 1.45, z: 1.95, h: 0.22, ry: -Math.PI / 2}); place('vase', g, {x: 4.78, y: 1.45, z: 2.73, h: 0.3}); }
     cyl(0.4, 0.42, 0.1, 'bed', 3.9, 0.05, 3.0, g, 24); const rim = new THREE.Mesh(new THREE.TorusGeometry(0.4, 0.08, 10, 28), M('bed')); rim.rotation.x = Math.PI / 2; rim.position.set(3.9, 0.12, 3.0); rim.castShadow = true; g.add(rim);
   }
   function buildPlayground() {
@@ -1365,6 +1473,7 @@ const Room = (() => {
     const ramp = box(1.6, 0.05, 0.5, 'slide', slideX + 0.55, 0.7, slideZ, g); ramp.rotation.z = -0.62;
     [-0.27, 0.27].forEach(dz => { const r = box(1.6, 0.1, 0.03, 'slide', slideX + 0.55, 0.76, slideZ + dz, g); r.rotation.z = -0.62; });
     const pitX = -1.9, pitZ = 2.6;
+    place('duck', g, {x: pitX + 0.3, y: 0.3, z: pitZ - 0.15, h: 0.22, ry: 0.8}); place('ball', g, {x: -2.95, y: 0, z: 1.55, h: 0.075});
     box(1.4, 0.36, 0.08, 'pit', pitX, 0.18, pitZ - 0.66, g); box(1.4, 0.36, 0.08, 'pit', pitX, 0.18, pitZ + 0.66, g); box(0.08, 0.36, 1.4, 'pit', pitX - 0.66, 0.18, pitZ, g); box(0.08, 0.36, 1.4, 'pit', pitX + 0.66, 0.18, pitZ, g);
     const inst = new THREE.InstancedMesh(new THREE.SphereGeometry(0.08, 10, 8), new THREE.MeshStandardMaterial({roughness: 0.5}), 90); const dm = new THREE.Object3D();
     for (let i = 0; i < 90; i++) { dm.position.set(pitX + ((i * 0.6180339) % 1 - 0.5) * 1.15, 0.08 + ((i * 0.3819) % 1) * 0.2, pitZ + ((i * 0.7548) % 1 - 0.5) * 1.15); dm.updateMatrix(); inst.setMatrixAt(i, dm.matrix); inst.setColorAt(i, new THREE.Color(PAL[i % 5])); }
@@ -1373,11 +1482,11 @@ const Room = (() => {
   }
   function rebuildAll() {
     if (!R) return;
-    buildShell(); buildThermostat(); buildWorkbench(); buildPinboard(); buildMachine(); buildMirror(); buildBoard(); buildGallery(); buildCorner(); buildPlayground();
+    buildShell(); buildThermostat(); buildWorkbench(); buildPinboard(); buildMachine(); buildMirror(); buildBoard(); buildGallery(); buildCorner(); buildPlayground(); buildPortfolio();
     [R.shell, ...Object.values(R.groups)].forEach(mergeEdges);
     applyLights(); refreshDyn(); R.obstacles = obstacles();
   }
-  function recolor(key) { const c = CFG.parts[key].color; R.scene.traverse(o => { if (o.material && o.material.userData && o.material.userData.part === key) o.material.color.set(c); }); }
+  function recolor(key) { const c = CFG.parts[key].color; R.scene.traverse(o => { if (o.material && o.material.userData && o.material.userData.part === key) o.material.color.set(c); else if (o.material && o.material.userData && o.material.userData.tintPart === key) o.material.color.set('#ffffff').lerp(new THREE.Color(c), 0.3); }); }
 
   /* dynamic, data-driven parts */
   function drawJournal() {
@@ -1474,7 +1583,7 @@ const Room = (() => {
 
   /* pets */
   function obstacles() {
-    const o = [[-4.35, -1.65, -4, -1.95], [1.3, 2.6, -3.7, -2.5], [3.25, 4.5, -3.6, -2.35], [1.2, 2.2, 1.1, 2.1], [0.45, 1.35, 0.7, 1.6], [2.05, 2.95, 1.6, 2.5], [-4.35, -2.45, 2.55, 3.45], [-2.7, -1.1, 1.85, 3.35, 'pit'], [-5, -4.2, 1.7, 2.5]];
+    const o = [[-4.35, -1.65, -4, -1.95], [1.3, 2.6, -3.7, -2.5], [3.25, 4.5, -3.6, -2.35], [1.2, 2.2, 1.1, 2.1], [0.45, 1.35, 0.7, 1.6], [2.05, 2.95, 1.6, 2.5], [-4.35, -2.45, 2.55, 3.45], [-2.7, -1.1, 1.85, 3.35, 'pit'], [-5, -4.2, 1.7, 2.5], [2.55, 3.45, 0.35, 1.2], [4.5, 5, 1.75, 2.95], [-5, -4.05, -3.9, -3.0]];
     if (CFG.parts.board.type === 'easel') o.push([3.7, 4.9, -1.2, 0.4]);
     return o;
   }
@@ -1755,18 +1864,19 @@ const Room = (() => {
   function build() {
     const stage = $('#roomStage'); let renderer;
     try { renderer = new THREE.WebGLRenderer({antialias: true}); } catch (e) { return false; }
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5)); renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFShadowMap;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5)); renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.domElement.id = 'roomCanvas'; renderer.domElement.setAttribute('role', 'img'); renderer.domElement.setAttribute('aria-label', 'A 3D workshop with a desk, cork board, idea machine, slide, sketch board, gallery wall, mirror, thermostat and pets');
     stage.appendChild(renderer.domElement);
     const scene = new THREE.Scene(); scene.background = new THREE.Color('#2b2420'); scene.fog = new THREE.Fog(scene.background, 12, 22);
     const camera = new THREE.PerspectiveCamera(46, 1, 0.1, 60);
     R = {renderer, scene, camera, groups: {}, dyn: {}, hover: null, yaw: 0, pitch: 0, cur: {pos: new THREE.Vector3(...V.room.pos), tgt: new THREE.Vector3(...V.room.tgt)}, tw: null, leverT: -1e9, fx: [], pets: [], nextBolt: performance.now() + 2500, boltUntil: 0, applied: ''};
     R.hemi = new THREE.HemisphereLight(0xfff3e0, 0x5a4030, 0.7); scene.add(R.hemi);
-    R.sun = new THREE.DirectionalLight(0xfff4e0, 0.9); R.sun.position.set(-3, 7, 4); R.sun.castShadow = true; R.sun.shadow.mapSize.set(1024, 1024); Object.assign(R.sun.shadow.camera, {left: -7, right: 7, top: 7, bottom: -7, near: 1, far: 20}); scene.add(R.sun);
+    R.sun = new THREE.DirectionalLight(0xfff4e0, 0.9); R.sun.position.set(-3, 7, 4); R.sun.castShadow = true; R.sun.shadow.mapSize.set(2048, 2048); R.sun.shadow.bias = -0.0004; R.sun.shadow.normalBias = 0.02; R.sun.shadow.radius = 3; Object.assign(R.sun.shadow.camera, {left: -7, right: 7, top: 7, bottom: -7, near: 1, far: 20}); scene.add(R.sun);
     R.lamp = new THREE.PointLight(0xffc98a, 1, 7, 1.6); scene.add(R.lamp);
     R.fill = new THREE.PointLight(0xffe2b8, 0.5, 10, 2); R.fill.position.set(1.5, 3.4, 1.5); scene.add(R.fill);
     R.neon1 = new THREE.PointLight(0xff3ea5, 0, 9, 1.5); R.neon1.position.set(-3, 2.5, 1); scene.add(R.neon1);
     R.neon2 = new THREE.PointLight(0x00e0ff, 0, 9, 1.5); R.neon2.position.set(3.5, 2.5, -1); scene.add(R.neon2);
+    if (THREE.RoomEnvironment) { try { const pg = new THREE.PMREMGenerator(renderer); scene.environment = pg.fromScene(new THREE.RoomEnvironment(), 0.04).texture; pg.dispose(); } catch (e) {} }
     R.shell = new THREE.Group(); scene.add(R.shell); R.petsG = new THREE.Group(); scene.add(R.petsG);
     R.skyCanvas = document.createElement('canvas'); R.skyCanvas.width = 512; R.skyCanvas.height = 360; R.skyCtx = R.skyCanvas.getContext('2d'); R.skyTex = new THREE.CanvasTexture(R.skyCanvas);
     R.archMask = ctex(256, 256, (x, w, h) => { x.fillStyle = '#000'; x.fillRect(0, 0, w, h); x.fillStyle = '#fff'; const r = w / 2; x.beginPath(); x.moveTo(0, h); x.lineTo(0, r * (h / w) * 1); x.ellipse(w / 2, r * (h / w), r, r * (h / w), 0, Math.PI, 0); x.lineTo(w, h); x.closePath(); x.fill(); });
@@ -1899,7 +2009,7 @@ function renderAll() {
   setAI();
   Room.refresh();
 }
-const STATIONS = ['workbench', 'pinboard', 'corner', 'machine', 'playground', 'wall', 'gallery', 'mirror', 'thermostat'];
+const STATIONS = ['workbench', 'pinboard', 'corner', 'machine', 'playground', 'wall', 'gallery', 'mirror', 'portfolio', 'thermostat'];
 function route() {
   const h = location.hash.slice(1); const st = STATIONS.includes(h) ? h : null; S.station = st || 'room';
   if (st !== 'thermostat') S.thermoList = false; const device = st === 'thermostat' && !S.thermoList; const pst = device ? null : st;
@@ -1913,6 +2023,7 @@ function route() {
   Room.focus(st);
   if (st === 'wall') setWallMode(S.wallMode);
   if (st === 'mirror') drawMirror();
+  if (st === 'portfolio') renderPortfolio();
   if (st === 'corner') renderChat();
   if (st === 'playground') { drawTimer(); drawWheel(); renderCorpse(); }
   if (st === 'thermostat') renderRoomCfg();
@@ -1985,6 +2096,7 @@ $('#saveEntry').addEventListener('click', () => {
   enrich(it.id);
 });
 $('#journalSearch').addEventListener('input', renderJournal);
+$('#workFilters').addEventListener('click', e => { const b = e.target.closest('[data-wf]'); if (!b) return; S.workFilter = b.dataset.wf; renderPortfolio(); });
 $('#pinImage').addEventListener('change', e => takePinImage(e.target.files[0]));
 const dz = $('#dropZone');
 ['dragenter', 'dragover'].forEach(t => dz.addEventListener(t, e => { e.preventDefault(); dz.classList.add('over'); }));
